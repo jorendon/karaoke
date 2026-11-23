@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, Mic2, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { buildSessionPublicUrl } from "@/lib/sessions";
+import type { Session } from "@/lib/database.types";
 import { AppHeader } from "@/components/AppHeader";
+import { DashboardClient, type DashboardSession } from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -18,20 +22,50 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  const supabase = getSupabaseServerClient();
+  const { data: sessionsData } = await supabase
+    .from("sessions")
+    .select("id, code, name, owner_id, is_active, created_at, closed_at")
+    .eq("owner_id", user.id)
+    .order("is_active", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const rawSessions = (sessionsData ?? []) as Session[];
+  const sessionIds = rawSessions.map((s) => s.id);
+
+  const queueCounts = new Map<string, number>();
+  if (sessionIds.length > 0) {
+    const { data: queueRows } = await supabase
+      .from("queue_items")
+      .select("session_id")
+      .in("session_id", sessionIds)
+      .in("status", ["pending", "playing"]);
+
+    for (const row of queueRows ?? []) {
+      const sid = (row as { session_id: string }).session_id;
+      queueCounts.set(sid, (queueCounts.get(sid) ?? 0) + 1);
+    }
+  }
+
+  const initialSessions: DashboardSession[] = rawSessions.map((session) => ({
+    ...session,
+    publicUrl: buildSessionPublicUrl(session.code),
+    activeQueueCount: queueCounts.get(session.id) ?? 0,
+  }));
+
   return (
     <div className="min-h-dvh bg-canvas">
       <AppHeader user={user} />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
               Hola, {user.display_name || user.username}
             </h1>
             <p className="mt-1 text-sm text-ink-secondary">
-              Sesión iniciada correctamente como{" "}
-              <span className="font-mono text-ink">@{user.username}</span> (
-              {user.role === "admin" ? "Administrador" : "Anfitrión"}).
+              Administra tus fiestas de karaoke y comparte el QR con tus
+              invitados.
             </p>
           </div>
 
@@ -46,30 +80,7 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <section className="surface-card mt-8 rounded-2xl p-8">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-ok/15 text-ok">
-              <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-stage">
-                Fase 2 · Autenticación lista
-              </p>
-              <h2 className="mt-1 text-xl font-semibold text-ink">
-                Tu cuenta de anfitrión ya funciona
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-secondary">
-                En la <strong className="text-ink">Fase 3</strong> aparecerá
-                aquí el panel completo para crear sesiones de fiesta, generar
-                códigos QR públicos y cerrar sesiones activas.
-              </p>
-              <div className="mt-5 inline-flex items-center gap-2 rounded-lg bg-canvas/80 px-3.5 py-2 text-xs text-ink-muted">
-                <Mic2 className="h-4 w-4 text-stage" aria-hidden="true" />
-                Siguiente paso: Fase 3 (Sesiones y QR)
-              </div>
-            </div>
-          </div>
-        </section>
+        <DashboardClient initialSessions={initialSessions} />
       </main>
     </div>
   );
