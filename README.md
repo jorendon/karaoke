@@ -1,62 +1,109 @@
-# Karaoke App — Bases del proyecto
+# Karaoke en Casa
 
-**Repositorio: https://github.com/jorendon/karaoke.git** — todo el código vive
-ahí; Antigravity clona este repo, escribe dentro de él y pushea a `main`
-al final de cada fase. Vercel despliega desde este mismo repo.
+Aplicación web de karaoke para fiestas en casa construida como un "wrapper" oficial de YouTube:
 
-App web tipo "wrapper de YouTube" enfocada solo en karaoke, para fiestas en casa:
-búsqueda por artista y género sobre un catálogo propio, reproductor embebido,
-sesiones protegidas por usuario/contraseña, y un QR por sesión para que los
-invitados agreguen canciones a la cola desde su celular.
+- Un **anfitrión** registrado inicia sesión, crea una **sesión** (fiesta) y muestra un **código QR** en su TV o laptop (`/host/[code]`).
+- Los **invitados** escanean el QR con su celular (`/s/[code]`), **sin crear cuenta**, escriben su nombre, buscan canciones en el catálogo y las agregan a la cola en tiempo real.
+- La pantalla del anfitrión reproduce los videos con el **reproductor oficial de YouTube (IFrame Player API)**, sincroniza la cola por **Supabase Realtime** y avanza automáticamente al terminar o si un video falla.
 
-## Qué contiene esta carpeta
+## Stack
 
-| Archivo | Para qué |
-|---|---|
-| `PROMPT-ANTIGRAVITY.md` | El prompt completo y específico para pegar en Antigravity. Es el documento principal. |
-| `supabase/schema.sql` | Esquema de la base de datos (usuarios, catálogo, sesiones, cola, playlists) + Realtime + RLS. |
-| `.env.example` | Variables de entorno necesarias (Supabase, YouTube API, secreto de sesión, URL pública). |
+- **Next.js 15 (App Router) + TypeScript + Tailwind CSS v4**
+- **Supabase** (Postgres + Realtime + RLS)
+- **YouTube IFrame Player API** (reproducción embebida oficial)
+- **YouTube Data API v3** exclusivamente desde el servidor (búsqueda de respaldo con caché 24 h, verificación previa con `videos.list` e indexación de canales con `playlistItems.list`)
+- **Autenticación propia** sobre `public.app_users` (`bcryptjs` + JWT HS256 con `jose` en cookie `httpOnly` `karaoke_session`)
+- **Despliegue:** Vercel
 
-## Stack decidido
+## Rutas principales
 
-- **Next.js (App Router) + TypeScript + Tailwind CSS** — desplegado en **Vercel** (dominio propio).
-- **Supabase** (Postgres + Realtime) — catálogo, usuarios, sesiones y cola sincronizada en vivo.
-- **YouTube IFrame Player API** para reproducir y **YouTube Data API v3** para buscar,
-  indexar canales de karaoke y **verificar que cada video exista y sea embebible**
-  antes de entrar a la cola.
+### Páginas
+- `/` — Redirige a `/dashboard` si hay sesión activa, o a `/login` si no.
+- `/login` — Inicio de sesión para anfitriones.
+- `/dashboard` — Sesiones activas/finalizadas, generador de QR y **Playlists guardadas** (crear listas y cargarlas a cualquier sesión activa).
+- `/catalog` — Explorador del catálogo, editor de artista/género e indexador web de canales de YouTube.
+- `/admin/users` — Gestión de usuarios (solo `role = 'admin'`).
+- `/host/[code]` — Pantalla TV/escritorio del anfitrión (3 columnas: cola con controles `↑ ↓ ▶ ✕`, reproductor YouTube 16:9 con auto-avance y controles grandes, panel del QR y cierre de sesión).
+- `/s/[code]` — Vista pública móvil para invitados (nombre en `localStorage`, buscador con filtros por artista/género y cola en vivo).
 
-## Pasos previos (antes o en paralelo a Antigravity)
+### APIs
+- `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+- `GET/POST /api/admin/users`, `PATCH/DELETE /api/admin/users/[id]`
+- `GET/POST /api/sessions`, `POST /api/sessions/[code]/close`, `GET /api/sessions/[code]/qr`
+- `GET /api/songs/search`, `PATCH /api/songs/[id]`, `POST /api/songs/index-channel`
+- `POST /api/queue/verify`
+- `GET/POST /api/sessions/[code]/queue`, `POST /api/sessions/[code]/queue/advance`, `PATCH /api/queue/[id]`
+- `GET/POST /api/playlists`, `DELETE /api/playlists/[id]`, `POST/DELETE /api/playlists/[id]/items`, `POST /api/playlists/[id]/load`
+- `GET /api/health`
 
-1. **Supabase:** crea un proyecto gratis en supabase.com → SQL Editor → pega y ejecuta
-   `supabase/schema.sql` → copia la URL y las claves (anon y service_role).
-2. **YouTube API key:** en Google Cloud Console crea un proyecto → activa
-   "YouTube Data API v3" → Credenciales → Crear clave de API.
-3. **Vercel:** crea el proyecto desde el repo y carga las variables de `.env.example`
-   en Settings → Environment Variables. Al final, conecta tu dominio.
-4. **Primer usuario:** la contraseña se guarda con hash bcrypt. El prompt de
-   Antigravity incluye una ruta/pantalla de administración para crear usuarios
-   (o un script `scripts/create-user.ts`); nunca insertes contraseñas en texto plano.
+## Variables de entorno
 
-## Cómo se usa con Antigravity
+Copia `.env.example` a `.env.local` (nunca se commitea) o cárgalas en **Vercel → Settings → Environment Variables**:
 
-1. Crea el proyecto vacío en Antigravity (o clona el repo) y copia dentro
-   `supabase/schema.sql` y `.env.example` → renombra a `.env.local` con tus valores.
-2. Pega el contenido completo de `PROMPT-ANTIGRAVITY.md` como primera instrucción.
-3. Antigravity construye por fases (el prompt las trae ordenadas). Revisa al final
-   de cada fase con los criterios de aceptación que el mismo prompt incluye.
+| Variable | Alcance | Descripción |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Pública | URL del proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Pública | Clave `anon` pública (solo lectura y Realtime) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor | Clave `service_role` (todas las escrituras y `app_users`) |
+| `YOUTUBE_API_KEY` | Solo servidor | Clave de Google Cloud restringida a YouTube Data API v3 |
+| `AUTH_SECRET` | Solo servidor | Secreto aleatorio (32+ chars) para firmar JWT |
+| `NEXT_PUBLIC_APP_URL` | Pública | URL pública de la app usada en enlaces y QR (ej. `https://karaoke.jrendon.dev`) |
 
-## Decisiones de diseño ya tomadas (están en el prompt)
+## Configuración paso a paso
 
-- **Usuarios en tabla propia** (`app_users`, usuario + contraseña con hash bcrypt,
-  sesión por cookie httpOnly firmada). Solo usuarios de la tabla pueden entrar,
-  crear sesiones y controlar el reproductor.
-- **Sesión = una fiesta.** El anfitrión crea una sesión y la app genera un enlace
-  público `/s/[codigo]` y su **QR**. Los invitados NO necesitan cuenta: abren el
-  enlace, buscan en el catálogo y agregan canciones con su nombre.
-- **Pantalla del anfitrión:** reproductor grande, la **cola a un lado** (con controles
-  para subir, bajar y eliminar cualquier canción) y el **panel del QR al otro lado**.
-- **Verificación antes de agregar:** ninguna canción entra a la cola sin pasar por el
-  servidor, que confirma con la API de YouTube que el video existe y es embebible;
-  el resultado se cachea en el catálogo para no gastar cuota dos veces.
-- **Cuota de la API:** la búsqueda principal es contra el catálogo propio (sin costo);
-  la API de YouTube es respaldo e indexación, siempre con caché.
+### 1. Base de datos (Supabase)
+1. Crea un proyecto en [supabase.com](https://supabase.com) (o con la integración nativa de Vercel).
+2. Abre **SQL Editor → New query**, pega el contenido completo de `supabase/schema.sql` y pulsa **Run**.
+
+### 2. Crear el primer usuario administrador
+**Opción A (desde terminal local):**
+```bash
+npm install
+npm run create-user
+```
+*(También soporta `--sql-only` para generar el `INSERT` con hash bcrypt sin conectarse desde tu PC).*
+
+**Opción B (directo en Supabase SQL Editor, sin usar terminal):**
+```sql
+create extension if not exists pgcrypto;
+
+insert into public.app_users (username, password_hash, display_name, role, is_active)
+values (
+  'admin',
+  crypt('TU_CONTRASENA_SEGURA', gen_salt('bf', 12)),
+  'Admin',
+  'admin',
+  true
+);
+```
+
+### 3. Configurar YouTube Data API v3
+1. En [Google Cloud Console](https://console.cloud.google.com) crea un proyecto (ej. `karaoke-app`).
+2. **APIs y servicios → Biblioteca** → busca y habilita **YouTube Data API v3**.
+3. **Credenciales → Crear credenciales → Clave de API** (tipo *Datos públicos*).
+4. Restringe la clave en **Restricciones de API** únicamente a **YouTube Data API v3** (deja *Restricciones de aplicaciones* en **Ninguno** porque las llamadas salen desde el servidor).
+5. Guarda la clave en `YOUTUBE_API_KEY`.
+
+### 4. Poblar el catálogo de karaoke
+Puedes indexar canales de karaoke (por ejemplo Sing King, KaraokeOnVEVO, Pocket Songs, Zoom Karaoke, Sing2Music) de dos formas (costo: **1 unidad de cuota por cada 50 canciones**):
+- **Desde la web:** entra a `/catalog`, escribe el `@handle` o ID `UC...` del canal y pulsa **Indexar**.
+- **Desde terminal:**
+  ```bash
+  npm run index-channel -- @SingKing --pages 4
+  ```
+
+### 5. Despliegue en Vercel y dominio propio
+1. En [vercel.com](https://vercel.com), pulsa **Add New → Project** e importa `jorendon/karaoke`.
+2. Carga las 6 variables de entorno en **Settings → Environment Variables** para `Production`, `Preview` y `Development`.
+3. Conecta tu dominio propio (ej. `karaoke.jrendon.dev`) en **Settings → Domains → Add Domain** y crea el registro `CNAME` que indique Vercel en tu proveedor DNS.
+4. Actualiza `NEXT_PUBLIC_APP_URL` a `https://karaoke.jrendon.dev` y haz un **Redeploy**.
+5. Si ya tenías sesiones abiertas antes del cambio de dominio, pulsa **Regenerar QR** para emitir el código actualizado con el dominio nuevo.
+6. Verifica el estado en `/api/health` (`"ok": true` y todas las variables en `true`).
+
+## Decisiones de diseño documentadas
+
+- **Verificación estricta antes de encolar:** tanto `POST /api/sessions/[code]/queue` como `POST /api/playlists/[id]/load` verifican cada video en el servidor (`songs` caché de 30 días o `videos.list` comprobando `embeddable === true`, `uploadStatus === 'processed'` y que no sea privado).
+- **Seguridad de sesiones de usuario:** cada ruta/página protegida valida la firma JWT **y** consulta `app_users.is_active` en servidor, de modo que un usuario desactivado o eliminado pierde acceso de inmediato.
+- **Compatibilidad de usuarios manuales:** el login acepta coincidencia exacta o en minúsculas del `username` para evitar bloqueos si un usuario se inserta manualmente con mayúsculas en SQL.
+- **Protección de claves:** `lib/env.server.ts` y `lib/supabase/server.ts` usan el paquete `server-only`, impidiendo en tiempo de compilación que `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY` o `AUTH_SECRET` lleguen al bundle del navegador.
+- **Caché de cuota YouTube:** las búsquedas siempre consultan primero la tabla `songs`; el respaldo `search.list` solo corre si hay `< 5` resultados locales y queda cacheado 24 h en servidor.
