@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { generateSessionQrDataUrl } from "@/lib/sessions";
-import type { Session } from "@/lib/database.types";
-import { HostSessionShell } from "./HostSessionShell";
+import type { QueueItem, Session } from "@/lib/database.types";
+import { HostScreenClient } from "./HostScreenClient";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,8 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { code } = await params;
   return {
-    title: `Sesión ${code}`,
-    description: "Pantalla del anfitrión de Karaoke en Casa.",
+    title: `Pantalla anfitrión · ${code}`,
+    description: "Reproductor de karaoke y cola en vivo para el anfitrión.",
   };
 }
 
@@ -43,22 +43,33 @@ export default async function HostSessionPage({ params }: PageProps) {
     notFound();
   }
 
-  // Solo el dueño de la sesión puede abrir la pantalla del anfitrión
+  // Solo el dueño de la sesión puede controlar la pantalla del anfitrión
   if (session.owner_id !== user.id) {
     redirect("/dashboard");
   }
 
-  const { publicUrl, qrDataUrl } = await generateSessionQrDataUrl(
-    session.code
-  );
+  const [{ publicUrl, qrDataUrl }, { data: queueData }] = await Promise.all([
+    generateSessionQrDataUrl(session.code),
+    supabase
+      .from("queue_items")
+      .select(
+        "id, session_id, song_id, youtube_video_id, title, artist, requested_by, position, status, created_at"
+      )
+      .eq("session_id", session.id)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
 
   return (
-    <HostSessionShell
+    <HostScreenClient
+      sessionId={session.id}
       code={session.code}
       name={session.name}
-      isActive={session.is_active}
+      initialIsActive={session.is_active}
+      initialQueue={(queueData ?? []) as QueueItem[]}
       publicUrl={publicUrl}
       qrDataUrl={qrDataUrl}
+      hostDisplayName={user.display_name || user.username}
     />
   );
 }

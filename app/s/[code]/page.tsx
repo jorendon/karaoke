@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Mic2, Radio } from "lucide-react";
+import { Mic2 } from "lucide-react";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { Session } from "@/lib/database.types";
+import { getCatalogFilters } from "@/lib/catalog/search";
+import type { QueueItem, Session, Song } from "@/lib/database.types";
+import { GuestScreenClient } from "./GuestScreenClient";
 
 export const dynamic = "force-dynamic";
 
@@ -75,34 +77,38 @@ export default async function GuestSessionPage({ params }: PageProps) {
     );
   }
 
-  return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8 sm:px-6">
-      <header className="surface-card rounded-2xl p-6 text-center">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-ok/15 px-3 py-1 text-xs font-semibold text-ok">
-          <Radio className="h-3.5 w-3.5" aria-hidden="true" />
-          Sesión en vivo
-        </span>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {session.name}
-        </h1>
-        <p className="mt-1 font-mono text-xs text-ink-muted">
-          Código: {session.code}
-        </p>
-      </header>
+  const [{ data: queueData }, { data: songsData }, filters] = await Promise.all(
+    [
+      supabase
+        .from("queue_items")
+        .select(
+          "id, session_id, song_id, youtube_video_id, title, artist, requested_by, position, status, created_at"
+        )
+        .eq("session_id", session.id)
+        .order("position", { ascending: true })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("songs")
+        .select(
+          "id, youtube_video_id, title, artist, genre, channel_title, thumbnail_url, duration_seconds, is_embeddable, last_verified_at, created_at"
+        )
+        .eq("is_embeddable", true)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      getCatalogFilters(),
+    ]
+  );
 
-      <section className="surface-card mt-6 rounded-2xl p-6 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-stage/15 text-stage">
-          <Mic2 className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <h2 className="mt-3 text-lg font-semibold text-ink">
-          ¡Conectado a la fiesta!
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
-          El enlace público y el código QR ya funcionan sin iniciar sesión. En
-          las Fases 4 a 6 aquí aparecerá el buscador de canciones y la cola en
-          vivo.
-        </p>
-      </section>
-    </main>
+  return (
+    <GuestScreenClient
+      sessionId={session.id}
+      code={session.code}
+      name={session.name}
+      initialIsActive={session.is_active}
+      initialQueue={(queueData ?? []) as QueueItem[]}
+      initialSongs={(songsData ?? []) as Song[]}
+      initialArtists={filters.artists}
+      initialGenres={filters.genres}
+    />
   );
 }
