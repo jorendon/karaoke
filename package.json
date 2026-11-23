@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "create-user": "tsx scripts/create-user.ts"
+    "create-user": "tsx scripts/create-user.ts",
+    "index-channel": "tsx scripts/index-channel.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

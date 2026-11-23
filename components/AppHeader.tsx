@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, LogOut, Mic2, Shield, Users } from "lucide-react";
+import { LayoutDashboard, LogOut, Mic2, Music, Shield, Users } from "lucide-react";
 import type { PublicAppUser } from "@/lib/database.types";
 
 interface AppHeaderProps {
@@ -58,6 +58,14 @@ export function AppHeader({ user }: AppHeaderProps) {
               Sesiones
             </Link>
 
+            <Link
+              href="/catalog"
+              className={navLinkClass(pathname.startsWith("/catalog"))}
+            >
+              <Music className="h-4 w-4" aria-hidden="true" />
+              Catálogo
+            </Link>
+
             {user.role === "admin" && (
               <Link
                 href="/admin/users"
@@ -70,7 +78,15 @@ export function AppHeader({ user }: AppHeaderProps) {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/catalog"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:text-ink sm:hidden"
+          >
+            <Music className="h-3.5 w-3.5" aria-hidden="true" />
+            Catálogo
+          </Link>
+
           {user.role === "admin" && (
             <Link
               href="/admin/users"
