@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  --bg-canvas: #0b0b0e;
+  --bg-surface: #131318;
+  --bg-elevated: #1c1c24;
+  --bg-hover: #252530;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-primary: #f6f4ef;
+  --text-secondary: #a4a199;
+  --text-muted: #706e68;
+  --accent-amber: #f59e0b;
+  --accent-amber-hover: #fbbf24;
+  --accent-coral: #f43f5e;
+  --accent-emerald: #10b981;
+}
+
+@theme inline {
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-hover: var(--bg-hover);
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-stage: var(--accent-amber);
+  --color-stage-hover: var(--accent-amber-hover);
+  --color-live: var(--accent-coral);
+  --color-ok: var(--accent-emerald);
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+* {
+  border-color: var(--border-subtle);
+}
+
+html {
+  color-scheme: dark;
+  background-color: var(--bg-canvas);
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar sutil adaptado al tema oscuro */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2b2b36;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3d3d4d;
+}
+
+/* Superficie elevada sutil con profundidad para tarjetas */
+.surface-card {
+  background: linear-gradient(
+    180deg,
+    rgba(28, 28, 36, 0.92) 0%,
+    rgba(19, 19, 24, 0.96) 100%
+  );
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
