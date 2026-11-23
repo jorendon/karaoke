@@ -14,10 +14,15 @@ import {
   Loader2,
   Maximize2,
   Mic2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Pause,
   Play,
   Plus,
   PowerOff,
+  QrCode,
   Radio,
   Search,
   SkipForward,
@@ -79,6 +84,8 @@ export function HostScreenClient({
   const [closing, setClosing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showQueueDrawer, setShowQueueDrawer] = useState(true);
+  const [showQrDrawer, setShowQrDrawer] = useState(true);
   const [hostRequestName, setHostRequestName] = useState(hostDisplayName);
   const [toast, setToast] = useState<{
     type: "info" | "error" | "success";
@@ -272,9 +279,75 @@ export function HostScreenClient({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowQueueDrawer((prev) => !prev)}
+              aria-pressed={showQueueDrawer}
+              title={showQueueDrawer ? "Recoger cola" : "Mostrar cola"}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                showQueueDrawer
+                  ? "border-stage/40 bg-stage/15 text-stage"
+                  : "border-white/10 bg-surface text-ink-secondary hover:border-white/20 hover:bg-elevated hover:text-ink"
+              }`}
+            >
+              {showQueueDrawer ? (
+                <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+              )}
+              <span>Cola ({pendingItems.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowQrDrawer((prev) => !prev)}
+              aria-pressed={showQrDrawer}
+              title={showQrDrawer ? "Recoger QR" : "Mostrar QR"}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                showQrDrawer
+                  ? "border-stage/40 bg-stage/15 text-stage"
+                  : "border-white/10 bg-surface text-ink-secondary hover:border-white/20 hover:bg-elevated hover:text-ink"
+              }`}
+            >
+              <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>QR</span>
+              {showQrDrawer ? (
+                <PanelRightClose className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+
+            {(showQueueDrawer || showQrDrawer) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQueueDrawer(false);
+                  setShowQrDrawer(false);
+                }}
+                title="Recoger ambos paneles para ampliar el video"
+                className="hidden items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-white/20 hover:bg-elevated hover:text-ink sm:inline-flex"
+              >
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Ampliar video
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQueueDrawer(true);
+                  setShowQrDrawer(true);
+                }}
+                title="Mostrar cola y QR"
+                className="hidden items-center gap-1.5 rounded-xl border border-stage/40 bg-stage/15 px-3 py-1.5 text-xs font-semibold text-stage transition-colors hover:bg-stage/25 sm:inline-flex"
+              >
+                Mostrar paneles
+              </button>
+            )}
+
             <span
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold ${
                 connected
                   ? "bg-ok/15 text-ok"
                   : "bg-elevated text-ink-secondary"
@@ -285,7 +358,7 @@ export function HostScreenClient({
             </span>
 
             {!isActive && (
-              <span className="rounded-lg bg-live/15 px-3 py-1.5 text-xs font-semibold text-live">
+              <span className="rounded-xl bg-live/15 px-3 py-1.5 text-xs font-semibold text-live">
                 Sesión cerrada
               </span>
             )}
@@ -323,10 +396,15 @@ export function HostScreenClient({
           </div>
         )}
 
-        {/* Layout TV / Escritorio en 3 columnas (móvil apila: reproductor, cola, QR) */}
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-          {/* COLUMNA IZQUIERDA — La cola */}
-          <aside className="surface-card order-2 flex flex-col rounded-2xl p-5 lg:order-1 lg:col-span-3 lg:max-h-[calc(100dvh-6.5rem)]">
+        {/* Layout TV / Escritorio con drawers plegables (sin desmontar el reproductor) */}
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+          {/* DRAWER IZQUIERDO — La cola */}
+          <aside
+            aria-label="Cola de canciones"
+            className={`surface-card order-2 flex-col rounded-2xl p-5 lg:order-1 lg:max-h-[calc(100dvh-6.5rem)] lg:w-[340px] lg:shrink-0 xl:w-[370px] ${
+              showQueueDrawer ? "flex" : "hidden"
+            }`}
+          >
             <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3.5">
               <div className="flex items-center gap-2">
                 <ListMusic className="h-5 w-5 text-stage" aria-hidden="true" />
@@ -335,16 +413,27 @@ export function HostScreenClient({
                 </h2>
               </div>
 
-              {isActive && (
+              <div className="flex items-center gap-1.5">
+                {isActive && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSearchModal(true)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-stage px-3 py-1.5 text-xs font-bold text-canvas transition-colors hover:bg-stage-hover"
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Agregar
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setShowSearchModal(true)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-stage px-3 py-1.5 text-xs font-bold text-canvas transition-colors hover:bg-stage-hover"
+                  onClick={() => setShowQueueDrawer(false)}
+                  title="Recoger cola"
+                  aria-label="Recoger panel de cola"
+                  className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
                 >
-                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                  Agregar
+                  <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
                 </button>
-              )}
+              </div>
             </div>
 
             {/* Ahora suena */}
@@ -517,7 +606,11 @@ export function HostScreenClient({
           </aside>
 
           {/* COLUMNA CENTRAL — Reproductor YouTube 16:9 + Controles grandes */}
-          <main className="order-1 flex flex-col gap-5 lg:order-2 lg:col-span-6">
+          <main
+            className={`order-1 flex min-w-0 flex-1 flex-col gap-5 lg:order-2 ${
+              !showQueueDrawer && !showQrDrawer ? "mx-auto w-full max-w-[1380px]" : ""
+            }`}
+          >
             <YouTubeKaraokePlayer
               ref={playerRef}
               videoId={playingItem?.youtube_video_id ?? null}
@@ -607,17 +700,34 @@ export function HostScreenClient({
             </section>
           </main>
 
-          {/* COLUMNA DERECHA — Panel de la sesión + QR */}
-          <aside className="surface-card order-3 flex flex-col justify-between gap-6 rounded-2xl p-6 lg:col-span-3">
+          {/* DRAWER DERECHO — Panel de la sesión + QR */}
+          <aside
+            aria-label="Panel de sesión y código QR"
+            className={`surface-card order-3 flex-col justify-between gap-6 rounded-2xl p-6 lg:w-[320px] lg:shrink-0 xl:w-[350px] ${
+              showQrDrawer ? "flex" : "hidden"
+            }`}
+          >
             <div>
               <div className="flex items-center justify-between gap-2">
-                <span className="rounded-lg border border-white/10 bg-canvas px-2.5 py-1 font-mono text-xs font-semibold text-stage">
-                  {code}
-                </span>
-                <span className="rounded-lg bg-elevated px-2.5 py-1 text-xs font-semibold text-ink-secondary">
-                  {totalInQueue}{" "}
-                  {totalInQueue === 1 ? "canción en cola" : "canciones en cola"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-lg border border-white/10 bg-canvas px-2.5 py-1 font-mono text-xs font-semibold text-stage">
+                    {code}
+                  </span>
+                  <span className="rounded-lg bg-elevated px-2.5 py-1 text-xs font-semibold text-ink-secondary">
+                    {totalInQueue}{" "}
+                    {totalInQueue === 1 ? "en cola" : "en cola"}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQrDrawer(false)}
+                  title="Recoger panel QR"
+                  aria-label="Recoger panel QR"
+                  className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
+                >
+                  <PanelRightClose className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
 
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-ink">
