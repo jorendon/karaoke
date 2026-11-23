@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import type { Session } from "@/lib/database.types";
 import { SessionQrCard } from "@/components/SessionQrCard";
+import {
+  PlaylistsSection,
+  type SavedPlaylist,
+} from "@/components/PlaylistsSection";
 
 export interface DashboardSession extends Session {
   publicUrl: string;
@@ -26,6 +30,7 @@ export interface DashboardSession extends Session {
 
 interface DashboardClientProps {
   initialSessions: DashboardSession[];
+  initialPlaylists: SavedPlaylist[];
 }
 
 interface QrModalState {
@@ -35,7 +40,10 @@ interface QrModalState {
   qrDataUrl: string;
 }
 
-export function DashboardClient({ initialSessions }: DashboardClientProps) {
+export function DashboardClient({
+  initialSessions,
+  initialPlaylists,
+}: DashboardClientProps) {
   const [sessions, setSessions] = useState<DashboardSession[]>(initialSessions);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -421,6 +429,27 @@ export function DashboardClient({ initialSessions }: DashboardClientProps) {
           </div>
         )}
       </section>
+
+      {/* Playlists guardadas */}
+      <PlaylistsSection
+        initialPlaylists={initialPlaylists}
+        activeSessions={activeSessions.map((s) => ({
+          code: s.code,
+          name: s.name,
+        }))}
+        onQueueLoaded={(sessionCode, addedCount) => {
+          setSessions((prev) =>
+            prev.map((item) =>
+              item.code === sessionCode
+                ? {
+                    ...item,
+                    activeQueueCount: item.activeQueueCount + addedCount,
+                  }
+                : item
+            )
+          );
+        }}
+      />
 
       {/* Historial de sesiones cerradas */}
       {closedSessions.length > 0 && (

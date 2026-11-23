@@ -5,8 +5,9 @@ import { Users } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { buildSessionPublicUrl } from "@/lib/sessions";
-import type { Session } from "@/lib/database.types";
+import type { Playlist, PlaylistItem, Session } from "@/lib/database.types";
 import { AppHeader } from "@/components/AppHeader";
+import type { SavedPlaylist } from "@/components/PlaylistsSection";
 import { DashboardClient, type DashboardSession } from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -23,34 +24,67 @@ export default async function DashboardPage() {
   }
 
   const supabase = getSupabaseServerClient();
-  const { data: sessionsData } = await supabase
-    .from("sessions")
-    .select("id, code, name, owner_id, is_active, created_at, closed_at")
-    .eq("owner_id", user.id)
-    .order("is_active", { ascending: false })
-    .order("created_at", { ascending: false });
+  const [{ data: sessionsData }, { data: playlistsData }] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("id, code, name, owner_id, is_active, created_at, closed_at")
+      .eq("owner_id", user.id)
+      .order("is_active", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("playlists")
+      .select("id, owner_id, name, created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const rawSessions = (sessionsData ?? []) as Session[];
   const sessionIds = rawSessions.map((s) => s.id);
+  const rawPlaylists = (playlistsData ?? []) as Playlist[];
+  const playlistIds = rawPlaylists.map((p) => p.id);
+
+  const [queueRes, playlistItemsRes] = await Promise.all([
+    sessionIds.length > 0
+      ? supabase
+          .from("queue_items")
+          .select("session_id")
+          .in("session_id", sessionIds)
+          .in("status", ["pending", "playing"])
+      : Promise.resolve({ data: [] }),
+    playlistIds.length > 0
+      ? supabase
+          .from("playlist_items")
+          .select(
+            "id, playlist_id, song_id, youtube_video_id, title, artist, position, created_at"
+          )
+          .in("playlist_id", playlistIds)
+          .order("position", { ascending: true })
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const queueCounts = new Map<string, number>();
-  if (sessionIds.length > 0) {
-    const { data: queueRows } = await supabase
-      .from("queue_items")
-      .select("session_id")
-      .in("session_id", sessionIds)
-      .in("status", ["pending", "playing"]);
+  for (const row of queueRes.data ?? []) {
+    const sid = (row as { session_id: string }).session_id;
+    queueCounts.set(sid, (queueCounts.get(sid) ?? 0) + 1);
+  }
 
-    for (const row of queueRows ?? []) {
-      const sid = (row as { session_id: string }).session_id;
-      queueCounts.set(sid, (queueCounts.get(sid) ?? 0) + 1);
-    }
+  const itemsByPlaylist = new Map<string, PlaylistItem[]>();
+  for (const row of (playlistItemsRes.data ?? []) as PlaylistItem[]) {
+    const list = itemsByPlaylist.get(row.playlist_id) ?? [];
+    list.push(row);
+    itemsByPlaylist.set(row.playlist_id, list);
   }
 
   const initialSessions: DashboardSession[] = rawSessions.map((session) => ({
     ...session,
     publicUrl: buildSessionPublicUrl(session.code),
     activeQueueCount: queueCounts.get(session.id) ?? 0,
+  }));
+
+  const initialPlaylists: SavedPlaylist[] = rawPlaylists.map((playlist) => ({
+    ...playlist,
+    items: itemsByPlaylist.get(playlist.id) ?? [],
   }));
 
   return (
@@ -64,8 +98,8 @@ export default async function DashboardPage() {
               Hola, {user.display_name || user.username}
             </h1>
             <p className="mt-1 text-sm text-ink-secondary">
-              Administra tus fiestas de karaoke y comparte el QR con tus
-              invitados.
+              Administra tus fiestas de karaoke, playlists guardadas y comparte
+              el QR con tus invitados.
             </p>
           </div>
 
@@ -80,7 +114,10 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <DashboardClient initialSessions={initialSessions} />
+        <DashboardClient
+          initialSessions={initialSessions}
+          initialPlaylists={initialPlaylists}
+        />
       </main>
     </div>
   );
