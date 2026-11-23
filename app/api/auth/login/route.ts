@@ -20,16 +20,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const rawUsername =
-    typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
+  const trimmedUsername =
+    typeof body.username === "string" ? body.username.trim() : "";
+  const lowerUsername = trimmedUsername.toLowerCase();
   const rawPassword = typeof body.password === "string" ? body.password : "";
 
-  if (!rawUsername || !rawPassword) {
+  if (!trimmedUsername || !rawPassword) {
     return NextResponse.json(
       { error: INVALID_CREDENTIALS_MESSAGE },
       { status: 401 }
     );
   }
+
+  const candidateUsernames = Array.from(
+    new Set([trimmedUsername, lowerUsername])
+  );
 
   try {
     const supabase = getSupabaseServerClient();
@@ -38,7 +43,8 @@ export async function POST(request: Request) {
       .select(
         "id, username, password_hash, display_name, role, is_active, created_at"
       )
-      .eq("username", rawUsername)
+      .in("username", candidateUsernames)
+      .limit(1)
       .maybeSingle();
 
     if (error) {
