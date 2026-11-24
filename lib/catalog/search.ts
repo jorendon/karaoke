@@ -104,59 +104,79 @@ async function queryLocalSongs(params: {
   return (data ?? []) as Song[];
 }
 
-async function upsertCandidatesIntoSongs(
+async function insertNewCandidatesIntoSongs(
   candidates: YoutubeVideoCandidate[],
   defaultGenre?: string | null
-): Promise<number> {
-  if (candidates.length === 0) return 0;
-
-  const supabase = getSupabaseServerClient();
-  const ids = candidates.map((c) => c.youtube_video_id);
-
-  // Consultar existentes para no sobrescribir artist/genre editados por el anfitrión
-  const { data: existingRows } = await supabase
-    .from("songs")
-    .select("youtube_video_id, artist, genre")
-    .in("youtube_video_id", ids);
-
-  const existingMap = new Map<
-    string,
-    { artist: string | null; genre: string | null }
-  >();
-  for (const row of existingRows ?? []) {
-    const r = row as {
-      youtube_video_id: string;
-      artist: string | null;
-      genre: string | null;
-    };
-    existingMap.set(r.youtube_video_id, {
-      artist: r.artist,
-      genre: r.genre,
-    });
+): Promise<{ addedCount: number; skippedExistingCount: number }> {
+  if (candidates.length === 0) {
+    return { addedCount: 0, skippedExistingCount: 0 };
   }
 
-  const rowsToUpsert = candidates.map((candidate) => {
-    const existing = existingMap.get(candidate.youtube_video_id);
-    return {
-      youtube_video_id: candidate.youtube_video_id,
-      title: candidate.title,
-      artist: existing?.artist ?? candidate.artist,
-      genre: existing?.genre ?? (defaultGenre || null),
-      channel_title: candidate.channel_title,
-      thumbnail_url: candidate.thumbnail_url,
-      is_embeddable: true,
-    };
-  });
+  // Deduplicar dentro del mismo lote por si YouTube repite un video
+  const uniqueByVideoId = new Map<string, YoutubeVideoCandidate>();
+  for (const candidate of candidates) {
+    if (!uniqueByVideoId.has(candidate.youtube_video_id)) {
+      uniqueByVideoId.set(candidate.youtube_video_id, candidate);
+    }
+  }
+  const uniqueCandidates = Array.from(uniqueByVideoId.values());
+  const inBatchDuplicates = candidates.length - uniqueCandidates.length;
 
-  const { error } = await supabase.from("songs").upsert(rowsToUpsert, {
+  const supabase = getSupabaseServerClient();
+  const ids = uniqueCandidates.map((c) => c.youtube_video_id);
+
+  // Verificar primero cuáles ya existen en la base de datos para no repetir ni sobrescribir
+  const { data: existingRows, error: checkError } = await supabase
+    .from("songs")
+    .select("youtube_video_id")
+    .in("youtube_video_id", ids);
+
+  if (checkError) {
+    throw new Error(
+      `Error al verificar duplicados en catálogo: ${checkError.message}`
+    );
+  }
+
+  const existingIds = new Set<string>(
+    (existingRows ?? []).map(
+      (row) => (row as { youtube_video_id: string }).youtube_video_id
+    )
+  );
+
+  const newCandidates = uniqueCandidates.filter(
+    (candidate) => !existingIds.has(candidate.youtube_video_id)
+  );
+
+  const skippedExistingCount =
+    uniqueCandidates.length - newCandidates.length + inBatchDuplicates;
+
+  if (newCandidates.length === 0) {
+    return { addedCount: 0, skippedExistingCount };
+  }
+
+  const rowsToInsert = newCandidates.map((candidate) => ({
+    youtube_video_id: candidate.youtube_video_id,
+    title: candidate.title,
+    artist: candidate.artist,
+    genre: defaultGenre || null,
+    channel_title: candidate.channel_title,
+    thumbnail_url: candidate.thumbnail_url,
+    is_embeddable: true,
+  }));
+
+  const { error } = await supabase.from("songs").upsert(rowsToInsert, {
     onConflict: "youtube_video_id",
+    ignoreDuplicates: true,
   });
 
   if (error) {
     throw new Error(`Error al guardar canciones en catálogo: ${error.message}`);
   }
 
-  return rowsToUpsert.length;
+  return {
+    addedCount: rowsToInsert.length,
+    skippedExistingCount,
+  };
 }
 
 export interface SearchSongsResult {
@@ -243,7 +263,7 @@ export async function searchCatalogSongs(options: {
     youtubeSearchCache.set(cacheKey, Date.now());
 
     if (candidates.length > 0) {
-      await upsertCandidatesIntoSongs(candidates);
+      await insertNewCandidatesIntoSongs(candidates);
 
       // Combinar resultados locales con los recién guardados (por si el título de YouTube varía respecto a `q`)
       const refreshedLocal = await queryLocalSongs({ q, artist, genre, limit });
@@ -291,7 +311,9 @@ export async function searchCatalogSongs(options: {
 }
 
 /**
- * Indexa páginas de subidas de un canal de YouTube en `songs`.
+ * Indexa páginas de subidas de un canal de YouTube en `songs`,
+ * omitiendo videos que ya existan en la base de datos para nunca duplicar
+ * ni sobrescribir metadatos editados.
  * Costo: 1 unidad (channels.list) + 1 unidad por página de 50 videos (playlistItems.list).
  */
 export async function indexYoutubeChannel(options: {
@@ -302,7 +324,10 @@ export async function indexYoutubeChannel(options: {
   channelId: string;
   channelTitle: string;
   pagesFetched: number;
+  addedCount: number;
+  skippedExistingCount: number;
   videosProcessed: number;
+  totalCatalogCount: number;
   quotaUnitsEstimate: number;
 }> {
   const apiKey = getYoutubeApiKey();
@@ -315,7 +340,8 @@ export async function indexYoutubeChannel(options: {
 
   let pageToken: string | undefined;
   let pagesFetched = 0;
-  let videosProcessed = 0;
+  let addedCount = 0;
+  let skippedExistingCount = 0;
 
   while (pagesFetched < maxPages) {
     const page = await fetchPlaylistItemsPage(
@@ -326,21 +352,32 @@ export async function indexYoutubeChannel(options: {
     pagesFetched++;
 
     if (page.videos.length > 0) {
-      videosProcessed += await upsertCandidatesIntoSongs(
+      const stats = await insertNewCandidatesIntoSongs(
         page.videos,
         options.defaultGenre ?? null
       );
+      addedCount += stats.addedCount;
+      skippedExistingCount += stats.skippedExistingCount;
     }
 
     if (!page.nextPageToken) break;
     pageToken = page.nextPageToken;
   }
 
+  const supabase = getSupabaseServerClient();
+  const { count } = await supabase
+    .from("songs")
+    .select("id", { count: "exact", head: true })
+    .eq("is_embeddable", true);
+
   return {
     channelId: channel.channelId,
     channelTitle: channel.channelTitle,
     pagesFetched,
-    videosProcessed,
+    addedCount,
+    skippedExistingCount,
+    videosProcessed: addedCount + skippedExistingCount,
+    totalCatalogCount: count ?? 0,
     quotaUnitsEstimate: 1 + pagesFetched,
   };
 }

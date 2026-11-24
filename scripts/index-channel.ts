@@ -93,7 +93,8 @@ async function main() {
 
   let pageToken: string | undefined;
   let pagesFetched = 0;
-  let totalUpserted = 0;
+  let totalAdded = 0;
+  let totalSkipped = 0;
 
   while (pagesFetched < pages) {
     const page = await fetchPlaylistItemsPage(
@@ -107,49 +108,48 @@ async function main() {
       const ids = page.videos.map((v) => v.youtube_video_id);
       const { data: existingRows } = await supabase
         .from("songs")
-        .select("youtube_video_id, artist, genre")
+        .select("youtube_video_id")
         .in("youtube_video_id", ids);
 
-      const existingMap = new Map<
-        string,
-        { artist: string | null; genre: string | null }
-      >();
-      for (const row of existingRows ?? []) {
-        const r = row as {
-          youtube_video_id: string;
-          artist: string | null;
-          genre: string | null;
-        };
-        existingMap.set(r.youtube_video_id, {
-          artist: r.artist,
-          genre: r.genre,
-        });
-      }
+      const existingIds = new Set<string>(
+        (existingRows ?? []).map(
+          (row) => (row as { youtube_video_id: string }).youtube_video_id
+        )
+      );
 
-      const upsertRows = page.videos.map((v) => {
-        const existing = existingMap.get(v.youtube_video_id);
-        return {
+      const newVideos = page.videos.filter(
+        (v) => !existingIds.has(v.youtube_video_id)
+      );
+      const skippedInPage = page.videos.length - newVideos.length;
+      totalSkipped += skippedInPage;
+
+      if (newVideos.length > 0) {
+        const insertRows = newVideos.map((v) => ({
           youtube_video_id: v.youtube_video_id,
           title: v.title,
-          artist: existing?.artist ?? v.artist,
-          genre: existing?.genre ?? genre,
+          artist: v.artist,
+          genre,
           channel_title: v.channel_title,
           thumbnail_url: v.thumbnail_url,
           is_embeddable: true,
-        };
-      });
+        }));
 
-      const { error } = await supabase.from("songs").upsert(upsertRows, {
-        onConflict: "youtube_video_id",
-      });
+        const { error } = await supabase.from("songs").upsert(insertRows, {
+          onConflict: "youtube_video_id",
+          ignoreDuplicates: true,
+        });
 
-      if (error) {
-        throw new Error(`Error en upsert de página ${pagesFetched}: ${error.message}`);
+        if (error) {
+          throw new Error(
+            `Error al insertar página ${pagesFetched}: ${error.message}`
+          );
+        }
+
+        totalAdded += insertRows.length;
       }
 
-      totalUpserted += upsertRows.length;
       console.log(
-        `Página ${pagesFetched}/${pages}: ${upsertRows.length} videos procesados (acumulado: ${totalUpserted}).`
+        `Página ${pagesFetched}/${pages}: ${newVideos.length} nuevos, ${skippedInPage} ya existían (omitidos).`
       );
     }
 
@@ -161,7 +161,7 @@ async function main() {
   }
 
   console.log(
-    `\nListo: ${totalUpserted} canciones guardadas/actualizadas en 'songs' (~${1 + pagesFetched} unidades de cuota usadas).`
+    `\nListo: ${totalAdded} canciones nuevas agregadas, ${totalSkipped} ya existían en 'songs' (omitidas). Cuota aprox: ${1 + pagesFetched} unidades.`
   );
 }
 

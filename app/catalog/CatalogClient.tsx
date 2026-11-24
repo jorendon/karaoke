@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Download,
   Edit3,
+  Link2,
   Loader2,
   Music,
   Search,
@@ -48,6 +49,12 @@ export function CatalogClient({
   const [maxPages, setMaxPages] = useState(2);
   const [defaultGenre, setDefaultGenre] = useState("");
   const [indexing, setIndexing] = useState(false);
+
+  // Agregar video individual (URL o ID)
+  const [singleVideoInput, setSingleVideoInput] = useState("");
+  const [singleVideoArtist, setSingleVideoArtist] = useState("");
+  const [singleVideoGenre, setSingleVideoGenre] = useState("");
+  const [addingSingleVideo, setAddingSingleVideo] = useState(false);
 
   // Edición inline de canción
   const [editingSong, setEditingSong] = useState<Song | null>(null);
@@ -133,7 +140,9 @@ export function CatalogClient({
 
       const data = (await response.json().catch(() => ({}))) as {
         channelTitle?: string;
-        videosProcessed?: number;
+        addedCount?: number;
+        skippedExistingCount?: number;
+        totalCatalogCount?: number;
         quotaUnitsEstimate?: number;
         error?: string;
       };
@@ -146,12 +155,17 @@ export function CatalogClient({
         return;
       }
 
+      const added = data.addedCount ?? 0;
+      const skipped = data.skippedExistingCount ?? 0;
+
       setFeedback({
         type: "success",
-        text: `Canal "${data.channelTitle}" indexado: ${data.videosProcessed} canciones procesadas (~${data.quotaUnitsEstimate} unidades de cuota).`,
+        text: `Canal "${data.channelTitle}": ${added} nueva(s) agregada(s), ${skipped} ya existía(n) en tu catálogo (omitidas) · ~${data.quotaUnitsEstimate ?? 0} unidades de cuota.`,
       });
       setChannelInput("");
-      setTotalCount((prev) => prev + (data.videosProcessed ?? 0));
+      if (typeof data.totalCatalogCount === "number") {
+        setTotalCount(data.totalCatalogCount);
+      }
       await runSearch(q, artistFilter, genreFilter);
     } catch {
       setFeedback({
@@ -160,6 +174,60 @@ export function CatalogClient({
       });
     } finally {
       setIndexing(false);
+    }
+  }
+
+  async function handleAddSingleVideo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!singleVideoInput.trim()) return;
+
+    setAddingSingleVideo(true);
+    setFeedback(null);
+
+    try {
+      const response = await fetch("/api/songs/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          urlOrId: singleVideoInput.trim(),
+          artist: singleVideoArtist.trim() || null,
+          genre: singleVideoGenre || null,
+        }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        song?: Song;
+        duplicate?: boolean;
+        totalCatalogCount?: number;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setFeedback({
+          type: "error",
+          text: data.error || "No se pudo agregar el video.",
+        });
+        return;
+      }
+
+      setFeedback({
+        type: "success",
+        text: `Video agregado al catálogo: "${data.song?.title}".`,
+      });
+      setSingleVideoInput("");
+      setSingleVideoArtist("");
+      setSingleVideoGenre("");
+      if (typeof data.totalCatalogCount === "number") {
+        setTotalCount(data.totalCatalogCount);
+      }
+      await runSearch(q, artistFilter, genreFilter);
+    } catch {
+      setFeedback({
+        type: "error",
+        text: "Error de conexión al agregar el video.",
+      });
+    } finally {
+      setAddingSingleVideo(false);
     }
   }
 
@@ -354,6 +422,112 @@ export function CatalogClient({
                 </>
               ) : (
                 "Indexar"
+              )}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {/* Agregar video individual con verificación de duplicados */}
+      <section
+        aria-labelledby="add-single-video-heading"
+        className="surface-card rounded-2xl p-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Link2 className="h-5 w-5 text-stage" aria-hidden="true" />
+            <h2
+              id="add-single-video-heading"
+              className="text-lg font-semibold text-ink"
+            >
+              Agregar video individual de YouTube
+            </h2>
+          </div>
+          <span className="rounded-md bg-elevated px-2.5 py-1 text-xs text-ink-secondary">
+            Verifica duplicados antes de guardar
+          </span>
+        </div>
+
+        <p className="mt-1.5 text-sm text-ink-secondary">
+          Pega el enlace o ID de un video de YouTube. Primero se comprueba que
+          no exista en tu catálogo (0 cuota) y luego se verifica que sea
+          embebible.
+        </p>
+
+        <form
+          onSubmit={handleAddSingleVideo}
+          className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-12"
+        >
+          <div className="sm:col-span-5">
+            <label
+              htmlFor="single-video-url"
+              className="block text-xs font-medium uppercase tracking-wider text-ink-secondary"
+            >
+              Enlace o ID de YouTube
+            </label>
+            <input
+              id="single-video-url"
+              type="text"
+              required
+              value={singleVideoInput}
+              onChange={(e) => setSingleVideoInput(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=... o youtu.be/..."
+              className="mt-1.5 block w-full rounded-xl border border-white/10 bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-stage focus:outline-none focus:ring-2 focus:ring-stage/30"
+            />
+          </div>
+
+          <div className="sm:col-span-3">
+            <label
+              htmlFor="single-video-artist"
+              className="block text-xs font-medium uppercase tracking-wider text-ink-secondary"
+            >
+              Artista (opcional)
+            </label>
+            <input
+              id="single-video-artist"
+              type="text"
+              value={singleVideoArtist}
+              onChange={(e) => setSingleVideoArtist(e.target.value)}
+              placeholder="Ej. Luis Miguel"
+              className="mt-1.5 block w-full rounded-xl border border-white/10 bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-stage focus:outline-none focus:ring-2 focus:ring-stage/30"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label
+              htmlFor="single-video-genre"
+              className="block text-xs font-medium uppercase tracking-wider text-ink-secondary"
+            >
+              Género (opcional)
+            </label>
+            <select
+              id="single-video-genre"
+              value={singleVideoGenre}
+              onChange={(e) => setSingleVideoGenre(e.target.value)}
+              className="mt-1.5 block w-full rounded-xl border border-white/10 bg-canvas px-3 py-2.5 text-sm text-ink focus:border-stage focus:outline-none focus:ring-2 focus:ring-stage/30"
+            >
+              <option value="">Sin asignar</option>
+              {SUGGESTED_GENRES.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-end sm:col-span-2">
+            <button
+              type="submit"
+              disabled={addingSingleVideo}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-elevated px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-stage/40 hover:bg-hover disabled:opacity-60"
+            >
+              {addingSingleVideo ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Validando...
+                </>
+              ) : (
+                "Agregar video"
               )}
             </button>
           </div>
