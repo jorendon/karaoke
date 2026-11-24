@@ -4,6 +4,7 @@ import {
   UNPLAYABLE_VIDEO_MESSAGE,
   verifyYoutubeVideoForQueue,
 } from "@/lib/youtube/verify";
+import { computeFairInsertIndex } from "@/lib/queue/fairOrder";
 import type { QueueItem, Session } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
@@ -180,16 +181,43 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  // 3. Calcular position = max(position) + 1 de la sesión
-  const { data: maxRow } = await supabase
+  // 3. Leer cola actual para ubicar la canción con turnos justos (intercalando cantantes)
+  const { data: existingQueueData, error: queueReadError } = await supabase
     .from("queue_items")
-    .select("position")
+    .select("id, requested_by, position, status, created_at")
     .eq("session_id", session.id)
-    .order("position", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
 
-  const nextPosition = ((maxRow as { position: number } | null)?.position ?? 0) + 1;
+  if (queueReadError) {
+    return NextResponse.json(
+      { error: "No se pudo leer la cola actual." },
+      { status: 500 }
+    );
+  }
+
+  const existingQueue = (existingQueueData ?? []) as Array<
+    Pick<QueueItem, "id" | "requested_by" | "position" | "status" | "created_at">
+  >;
+
+  const playingItem =
+    existingQueue.find((row) => row.status === "playing") ?? null;
+  const pendingItems = existingQueue.filter((row) => row.status === "pending");
+
+  const maxNonPendingPos = existingQueue
+    .filter((row) => row.status !== "pending")
+    .reduce((max, row) => Math.max(max, row.position), 0);
+
+  const maxOverallPos = existingQueue.reduce(
+    (max, row) => Math.max(max, row.position),
+    0
+  );
+
+  const insertIndex = computeFairInsertIndex(
+    playingItem,
+    pendingItems,
+    requestedBy
+  );
 
   const finalTitle = (
     rawTitle ||
@@ -210,7 +238,7 @@ export async function POST(request: Request, context: RouteContext) {
       title: finalTitle,
       artist: finalArtist,
       requested_by: requestedBy,
-      position: nextPosition,
+      position: maxOverallPos + 1,
       status: "pending",
     })
     .select(
@@ -225,17 +253,36 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  // Calcular posición visible #N en la fila de pendientes
-  const { count: pendingCount } = await supabase
-    .from("queue_items")
-    .select("id", { count: "exact", head: true })
-    .eq("session_id", session.id)
-    .eq("status", "pending");
+  const insertedItem = inserted as QueueItem;
+
+  // Si corresponde intercalar antes del final, re-secuenciar las posiciones pendientes
+  const orderedPendingIds = pendingItems.map((row) => row.id);
+  orderedPendingIds.splice(insertIndex, 0, insertedItem.id);
+
+  const basePosition = maxNonPendingPos + 1;
+  let finalPosition = insertedItem.position;
+
+  if (insertIndex < pendingItems.length) {
+    const updates = orderedPendingIds.map((itemId, idx) => {
+      const nextPos = basePosition + idx;
+      if (itemId === insertedItem.id) {
+        finalPosition = nextPos;
+      }
+      return supabase
+        .from("queue_items")
+        .update({ position: nextPos })
+        .eq("id", itemId);
+    });
+    await Promise.all(updates);
+  }
 
   return NextResponse.json(
     {
-      item: inserted as QueueItem,
-      queuePosition: pendingCount ?? 1,
+      item: {
+        ...insertedItem,
+        position: finalPosition,
+      },
+      queuePosition: insertIndex + 1,
     },
     { status: 201 }
   );

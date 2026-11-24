@@ -18,6 +18,7 @@ import {
   QrCode,
   Radio,
   Search,
+  Shuffle,
   SkipForward,
   Smartphone,
   Tv,
@@ -63,6 +64,7 @@ export function HostRemoteClient({
   const [sendingCmd, setSendingCmd] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [shuffling, setShuffling] = useState(false);
   const [closing, setClosing] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "error" | "success";
@@ -186,6 +188,25 @@ export function HostRemoteClient({
       return { ok: true };
     } catch {
       return { ok: false, message: "Error de conexión." };
+    }
+  }
+
+  async function handleShuffleQueue() {
+    if (pendingItems.length <= 1 || shuffling) return;
+    setShuffling(true);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/sessions/${code}/queue/shuffle`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        setFeedback({ type: "error", text: "No se pudo mezclar la cola." });
+        return;
+      }
+      setFeedback({ type: "success", text: "Cola mezclada por turnos justos" });
+      await refreshQueue();
+    } finally {
+      setShuffling(false);
     }
   }
 
@@ -412,6 +433,24 @@ export function HostRemoteClient({
       {/* Pestaña 1: Cola con controles de anfitrión */}
       {activeTab === "controls" && (
         <section className="surface-card mt-4 rounded-2xl p-4">
+          {pendingItems.length > 1 && (
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                disabled={shuffling}
+                onClick={() => void handleShuffleQueue()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-canvas/80 px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:border-stage/40 hover:text-ink disabled:opacity-40"
+              >
+                {shuffling ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-stage" />
+                ) : (
+                  <Shuffle className="h-3.5 w-3.5 text-stage" aria-hidden="true" />
+                )}
+                Mezclar turnos al azar
+              </button>
+            </div>
+          )}
+
           {pendingItems.length === 0 ? (
             <div className="py-8 text-center">
               <Mic2

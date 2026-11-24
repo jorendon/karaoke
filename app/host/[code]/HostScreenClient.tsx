@@ -25,6 +25,7 @@ import {
   QrCode,
   Radio,
   Search,
+  Shuffle,
   SkipForward,
   Sparkles,
   User,
@@ -83,6 +84,7 @@ export function HostScreenClient({
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [shuffling, setShuffling] = useState(false);
   const [closing, setClosing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -390,6 +392,29 @@ export function HostScreenClient({
     }
   }
 
+  async function handleShuffleQueue() {
+    if (pendingItems.length <= 1 || shuffling) return;
+    setShuffling(true);
+    try {
+      const response = await fetch(`/api/sessions/${code}/queue/shuffle`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        showToast("error", data.error || "No se pudo mezclar la cola.");
+        return;
+      }
+      showToast("success", "Cola mezclada por turnos justos.");
+      await refreshQueue();
+    } catch {
+      showToast("error", "Error de conexión al mezclar la cola.");
+    } finally {
+      setShuffling(false);
+    }
+  }
+
   async function handleCloseSession() {
     const confirmed = window.confirm(
       `¿Cerrar la sesión "${name}"? Los invitados verán "Esta sesión terminó" y ya no podrán agregar canciones.`
@@ -604,6 +629,28 @@ export function HostScreenClient({
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                  {pendingItems.length > 1 && (
+                    <button
+                      type="button"
+                      disabled={shuffling}
+                      onClick={() => void handleShuffleQueue()}
+                      title="Mezclar turnos al azar (sin repetir cantante seguido)"
+                      aria-label="Mezclar cola por turnos justos"
+                      className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-stage/40 hover:bg-elevated hover:text-ink disabled:opacity-40"
+                    >
+                      {shuffling ? (
+                        <Loader2
+                          className="h-3.5 w-3.5 animate-spin"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Shuffle
+                          className="h-3.5 w-3.5 text-stage"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </button>
+                  )}
                   {isActive && (
                     <button
                       type="button"
