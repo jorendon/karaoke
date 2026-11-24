@@ -460,10 +460,10 @@ export function CatalogClient({
           <p className="mt-3 text-xs text-stage">{searchNotice}</p>
         )}
 
-        {/* Resultados */}
+        {/* Resultados con tamaño fijo y scroll interno */}
         <div className="mt-6">
           {songs.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 bg-canvas/50 p-10 text-center">
+            <div className="flex h-[460px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-canvas/50 p-10 text-center sm:h-[520px]">
               <p className="text-sm font-medium text-ink">
                 No se encontraron canciones todavía
               </p>
@@ -474,7 +474,7 @@ export function CatalogClient({
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/10 bg-canvas/50">
+            <ul className="h-[460px] divide-y divide-white/5 overflow-y-auto rounded-xl border border-white/10 bg-canvas/50 sm:h-[520px]">
               {songs.map((song) => (
                 <li
                   key={song.id}

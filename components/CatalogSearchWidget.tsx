@@ -231,7 +231,7 @@ export function CatalogSearchWidget({
       ) : (
         <ul
           className={`divide-y divide-white/5 overflow-y-auto rounded-xl border border-white/10 bg-canvas/50 ${
-            compact ? "max-h-[420px]" : "max-h-[560px]"
+            compact ? "h-[380px]" : "h-[460px]"
           }`}
         >
           {songs.map((song) => {

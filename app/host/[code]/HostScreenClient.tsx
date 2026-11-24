@@ -26,6 +26,7 @@ import {
   Radio,
   Search,
   SkipForward,
+  Sparkles,
   User,
   X,
 } from "lucide-react";
@@ -896,30 +897,85 @@ export function HostScreenClient({
               onPlayStateChange={setIsVideoPlaying}
             />
 
-            {/* Info actual + Botones grandes de TV */}
+            {/* Info actual (cantante grande) + Aviso neón del próximo cantante + Controles TV */}
             <section className="surface-card rounded-2xl p-6">
               <div className="flex flex-col gap-5">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-stage">
-                    {playingItem ? "Cantando ahora" : "En espera"}
-                  </p>
-                  <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl lg:text-4xl">
-                    {playingItem ? playingItem.title : name}
-                  </h1>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-ink-secondary sm:text-lg">
-                    {playingItem?.artist && <span>{playingItem.artist}</span>}
-                    {playingItem && (
-                      <span className="inline-flex items-center gap-1.5 font-semibold text-stage">
-                        <User className="h-4 w-4" aria-hidden="true" />
-                        Pedida por {playingItem.requested_by || "Invitado"}
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-stretch">
+                  {/* Quién está cantando ahora */}
+                  <div className="flex flex-col justify-center rounded-2xl border border-stage/25 bg-canvas/70 p-4 sm:p-5 xl:col-span-7">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-stage/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-stage">
+                        <Mic2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        {playingItem ? "Cantando ahora" : "En espera"}
                       </span>
-                    )}
-                    {!playingItem && (
-                      <span>
-                        Agrega canciones desde el QR para iniciar el espectáculo
-                      </span>
+                    </div>
+
+                    {playingItem ? (
+                      <>
+                        <p className="mt-2.5 flex items-center gap-2 text-2xl font-black tracking-tight text-stage sm:text-3xl lg:text-4xl">
+                          <User
+                            className="h-7 w-7 shrink-0 sm:h-8 sm:w-8"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">
+                            {playingItem.requested_by || "Invitado"}
+                          </span>
+                        </p>
+                        <h1 className="mt-1.5 line-clamp-2 text-lg font-bold leading-snug text-ink sm:text-xl lg:text-2xl">
+                          {playingItem.title}
+                        </h1>
+                        {playingItem.artist && (
+                          <p className="mt-0.5 truncate text-sm text-ink-secondary sm:text-base">
+                            {playingItem.artist}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+                          {name}
+                        </h1>
+                        <p className="mt-1 text-sm text-ink-secondary sm:text-base">
+                          Agrega canciones desde el QR para iniciar el
+                          espectáculo
+                        </p>
+                      </>
                     )}
                   </div>
+
+                  {/* Aviso de neón llamativo para el siguiente en cantar */}
+                  {pendingItems[0] ? (
+                    <div
+                      aria-live="polite"
+                      className="neon-next-box flex flex-col justify-center rounded-2xl p-4 sm:p-5 xl:col-span-5"
+                    >
+                      <p className="neon-next-label flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-[0.18em]">
+                        <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        ¡Prepárate! Siguiente en cantar
+                      </p>
+                      <p className="neon-next-name mt-2 truncate text-2xl font-black uppercase tracking-wide sm:text-3xl lg:text-4xl">
+                        {pendingItems[0].requested_by || "Invitado"}
+                      </p>
+                      <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-cyan-100/90 sm:text-base">
+                        🎵 {pendingItems[0].title}
+                        {pendingItems[0].artist
+                          ? ` — ${pendingItems[0].artist}`
+                          : ""}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col justify-center rounded-2xl border border-dashed border-white/15 bg-canvas/50 p-4 text-center sm:p-5 xl:col-span-5">
+                      <p className="text-xs font-bold uppercase tracking-widest text-ink-muted">
+                        Siguiente turno libre
+                      </p>
+                      <p className="mt-1.5 text-base font-semibold text-ink-secondary">
+                        ¿Quién se anima a cantar después?
+                      </p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Escanea el QR para pedir tu canción
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Controles grandes legibles desde lejos */}
