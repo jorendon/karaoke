@@ -10,14 +10,14 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Expand,
   ListMusic,
   Loader2,
   Maximize2,
   Mic2,
+  Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   Pause,
   Play,
   Plus,
@@ -87,6 +87,7 @@ export function HostScreenClient({
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showQueueDrawer, setShowQueueDrawer] = useState(true);
   const [showQrDrawer, setShowQrDrawer] = useState(true);
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [hostRequestName, setHostRequestName] = useState(hostDisplayName);
   const [toast, setToast] = useState<{
     type: "info" | "error" | "success";
@@ -105,6 +106,62 @@ export function HostScreenClient({
     const timer = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Sincronizar estado de pantalla completa de la app completa
+  useEffect(() => {
+    const syncFullscreen = () => {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element | null;
+      };
+      setIsAppFullscreen(
+        Boolean(doc.fullscreenElement || doc.webkitFullscreenElement)
+      );
+    };
+
+    syncFullscreen();
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    document.addEventListener("webkitfullscreenchange", syncFullscreen);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreen);
+    };
+  }, []);
+
+  const toggleAppFullscreen = useCallback(async () => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+    const rootEl = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+    };
+
+    try {
+      if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        }
+      } else {
+        if (rootEl.requestFullscreen) {
+          await rootEl.requestFullscreen();
+        } else if (rootEl.webkitRequestFullscreen) {
+          await rootEl.webkitRequestFullscreen();
+        } else {
+          showToast(
+            "info",
+            "Este navegador no permite activar pantalla completa automáticamente."
+          );
+        }
+      }
+    } catch {
+      showToast(
+        "info",
+        "No se pudo cambiar a pantalla completa en este navegador."
+      );
+    }
+  }, [showToast]);
 
   const advanceQueue = useCallback(
     async (markAs: "played" | "skipped" = "played", expectedItemId?: string) => {
@@ -245,7 +302,7 @@ export function HostScreenClient({
 
       if (key === "f" || key === "F") {
         event.preventDefault();
-        playerRef.current?.requestFullscreen();
+        void toggleAppFullscreen();
       } else if (key === "q" || key === "Q") {
         event.preventDefault();
         setShowQrDrawer((prev) => !prev);
@@ -264,7 +321,7 @@ export function HostScreenClient({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [advanceQueue, showQrDrawer, showSearchModal]);
+  }, [advanceQueue, showQrDrawer, showSearchModal, toggleAppFullscreen]);
 
   async function handleItemAction(
     itemId: string,
@@ -411,9 +468,9 @@ export function HostScreenClient({
               <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
               <span>QR</span>
               {showQrDrawer ? (
-                <PanelRightClose className="h-4 w-4" aria-hidden="true" />
+                <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
               ) : (
-                <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
               )}
             </button>
 
@@ -443,6 +500,34 @@ export function HostScreenClient({
                 Mostrar paneles
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => void toggleAppFullscreen()}
+              aria-pressed={isAppFullscreen}
+              title={
+                isAppFullscreen
+                  ? "Salir de pantalla completa (mostrar barra del navegador)"
+                  : "Ampliar app completa en la pantalla (oculta barra del navegador)"
+              }
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                isAppFullscreen
+                  ? "border-stage/40 bg-stage/15 text-stage"
+                  : "border-white/15 bg-elevated text-ink hover:border-stage/40 hover:bg-hover"
+              }`}
+            >
+              {isAppFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Salir pantalla completa</span>
+                </>
+              ) : (
+                <>
+                  <Expand className="h-3.5 w-3.5 text-stage" aria-hidden="true" />
+                  <span>Pantalla completa</span>
+                </>
+              )}
+            </button>
 
             <span
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold ${
@@ -494,219 +579,312 @@ export function HostScreenClient({
           </div>
         )}
 
-        {/* Layout TV / Escritorio con drawers plegables (sin desmontar el reproductor) */}
+        {/* Layout TV panorámico en 2 columnas: Izquierda (Cola + QR debajo) | Derecha (Reproductor gigante) */}
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-          {/* DRAWER IZQUIERDO — La cola */}
-          <aside
-            aria-label="Cola de canciones"
-            className={`surface-card order-2 flex-col rounded-2xl p-5 lg:order-1 lg:max-h-[calc(100dvh-6.5rem)] lg:w-[340px] lg:shrink-0 xl:w-[370px] ${
-              showQueueDrawer ? "flex" : "hidden"
+          {/* COLUMNA IZQUIERDA PLEGABLE — Cola arriba + QR debajo */}
+          <div
+            className={`order-2 flex-col gap-5 lg:order-1 lg:w-[350px] lg:shrink-0 xl:w-[380px] ${
+              showQueueDrawer || showQrDrawer ? "flex" : "hidden"
             }`}
           >
-            <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3.5">
-              <div className="flex items-center gap-2">
-                <ListMusic className="h-5 w-5 text-stage" aria-hidden="true" />
-                <h2 className="text-base font-bold uppercase tracking-wider text-ink">
-                  Cola ({pendingItems.length})
-                </h2>
+            {/* DRAWER 1 — La cola */}
+            <aside
+              aria-label="Cola de canciones"
+              className={`surface-card flex-col rounded-2xl p-5 ${
+                showQueueDrawer ? "flex" : "hidden"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3.5">
+                <div className="flex items-center gap-2">
+                  <ListMusic className="h-5 w-5 text-stage" aria-hidden="true" />
+                  <h2 className="text-base font-bold uppercase tracking-wider text-ink">
+                    Cola ({pendingItems.length})
+                  </h2>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {isActive && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSearchModal(true)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-stage px-3 py-1.5 text-xs font-bold text-canvas transition-colors hover:bg-stage-hover"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                      Agregar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowQueueDrawer(false)}
+                    title="Recoger cola"
+                    aria-label="Recoger panel de cola"
+                    className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
+                  >
+                    <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              {/* Ahora suena */}
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-stage">
+                  Ahora suena
+                </p>
+                {playingItem ? (
+                  <div className="mt-2 rounded-xl border border-stage/30 bg-stage/10 p-3.5">
+                    <p className="line-clamp-2 text-base font-bold leading-snug text-ink">
+                      {playingItem.title}
+                    </p>
+                    {playingItem.artist && (
+                      <p className="mt-0.5 truncate text-sm text-ink-secondary">
+                        {playingItem.artist}
+                      </p>
+                    )}
+                    <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-stage">
+                      <User className="h-3.5 w-3.5" aria-hidden="true" />
+                      {playingItem.requested_by || "Invitado"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 rounded-xl bg-canvas/60 px-3.5 py-3 text-sm text-ink-muted">
+                    Sin canción en reproducción
+                  </p>
+                )}
+              </div>
+
+              {/* Lista numerada de pendientes */}
+              <div
+                className={`mt-5 overflow-y-auto pr-1 ${
+                  showQrDrawer ? "max-h-[38vh]" : "max-h-[65vh]"
+                }`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                  Siguientes ({pendingItems.length})
+                </p>
+
+                {pendingItems.length === 0 ? (
+                  <div className="mt-2 rounded-xl border border-dashed border-white/10 bg-canvas/40 px-4 py-6 text-center text-sm text-ink-muted">
+                    La fila está vacía. Pide una canción desde el QR o pulsa{" "}
+                    <strong className="text-ink">+ Agregar</strong>.
+                  </div>
+                ) : (
+                  <ol className="mt-2 space-y-2">
+                    {pendingItems.map((item, idx) => {
+                      const isBusy = busyActionId === item.id;
+                      return (
+                        <li
+                          key={item.id}
+                          className="rounded-xl border border-white/10 bg-canvas/75 p-3 transition-colors hover:border-white/20"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-start gap-2.5">
+                              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-xs font-bold text-stage">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
+                                  {item.title}
+                                </p>
+                                {item.artist && (
+                                  <p className="truncate text-xs text-ink-secondary">
+                                    {item.artist}
+                                  </p>
+                                )}
+                                <p className="mt-1 text-xs font-medium text-ink-muted">
+                                  🎤 {item.requested_by || "Invitado"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Controles del anfitrión ↑ ↓ ▶ ✕ */}
+                          <div className="mt-2.5 flex items-center justify-end gap-1.5 border-t border-white/5 pt-2">
+                            <button
+                              type="button"
+                              disabled={isBusy || idx === 0}
+                              onClick={() => handleItemAction(item.id, "up")}
+                              title="Subir en la cola"
+                              aria-label={`Subir ${item.title}`}
+                              className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary transition-colors hover:bg-elevated hover:text-ink disabled:opacity-30"
+                            >
+                              <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isBusy || idx === pendingItems.length - 1}
+                              onClick={() => handleItemAction(item.id, "down")}
+                              title="Bajar en la cola"
+                              aria-label={`Bajar ${item.title}`}
+                              className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary transition-colors hover:bg-elevated hover:text-ink disabled:opacity-30"
+                            >
+                              <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() =>
+                                handleItemAction(item.id, "play-now")
+                              }
+                              title="Reproducir ahora"
+                              aria-label={`Reproducir ahora ${item.title}`}
+                              className="rounded-lg border border-stage/30 bg-stage/10 p-1.5 text-stage transition-colors hover:bg-stage/20 disabled:opacity-30"
+                            >
+                              <Play className="h-4 w-4" aria-hidden="true" />
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleItemAction(item.id, "remove")}
+                              title="Eliminar de la cola"
+                              aria-label={`Eliminar ${item.title}`}
+                              className="rounded-lg border border-live/25 bg-live/10 p-1.5 text-live transition-colors hover:bg-live/20 disabled:opacity-30"
+                            >
+                              <X className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+
+                {/* Sección colapsable "Ya sonaron" */}
+                <div className="mt-5 border-t border-white/10 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory((prev) => !prev)}
+                    className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-widest text-ink-muted hover:text-ink-secondary"
+                  >
+                    <span>Ya sonaron ({historyItems.length})</span>
+                    {showHistory ? (
+                      <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+
+                  {showHistory && (
+                    <ul className="mt-2.5 space-y-1.5">
+                      {historyItems.length === 0 ? (
+                        <li className="text-xs text-ink-muted">
+                          Todavía no ha terminado ninguna canción.
+                        </li>
+                      ) : (
+                        historyItems.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex items-center justify-between gap-2 rounded-lg bg-canvas/50 px-3 py-2 text-xs text-ink-muted"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-ink-secondary">
+                                {item.title}
+                              </p>
+                              <p className="truncate">
+                                {item.requested_by || "Invitado"}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded bg-elevated px-1.5 py-0.5 text-[10px]">
+                              {item.status === "skipped" ? "Saltada" : "Sonó"}
+                            </span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </aside>
+
+            {/* DRAWER 2 (debajo de la cola) — Panel de la sesión + QR */}
+            <aside
+              aria-label="Panel de sesión y código QR"
+              className={`surface-card flex-col justify-between gap-5 rounded-2xl p-5 ${
+                showQrDrawer ? "flex" : "hidden"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg border border-white/10 bg-canvas px-2.5 py-1 font-mono text-xs font-semibold text-stage">
+                      {code}
+                    </span>
+                    <span className="rounded-lg bg-elevated px-2.5 py-1 text-xs font-semibold text-ink-secondary">
+                      {totalInQueue} en cola
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowQrDrawer(false)}
+                    title="Recoger panel QR"
+                    aria-label="Recoger panel QR"
+                    className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
+                  >
+                    <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  <SessionQrCard
+                    code={code}
+                    name={name}
+                    initialPublicUrl={publicUrl}
+                    initialQrDataUrl={qrDataUrl}
+                    compact
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2.5 border-t border-white/10 pt-4">
                 {isActive && (
                   <button
                     type="button"
                     onClick={() => setShowSearchModal(true)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-stage px-3 py-1.5 text-xs font-bold text-canvas transition-colors hover:bg-stage-hover"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-white/20 hover:bg-elevated"
                   >
-                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                    Agregar
+                    <Search className="h-4 w-4 text-stage" aria-hidden="true" />
+                    Buscar y agregar canción
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setShowQueueDrawer(false)}
-                  title="Recoger cola"
-                  aria-label="Recoger panel de cola"
-                  className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
-                >
-                  <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-            </div>
 
-            {/* Ahora suena */}
-            <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-widest text-stage">
-                Ahora suena
-              </p>
-              {playingItem ? (
-                <div className="mt-2 rounded-xl border border-stage/30 bg-stage/10 p-3.5">
-                  <p className="line-clamp-2 text-base font-bold leading-snug text-ink">
-                    {playingItem.title}
-                  </p>
-                  {playingItem.artist && (
-                    <p className="mt-0.5 truncate text-sm text-ink-secondary">
-                      {playingItem.artist}
-                    </p>
-                  )}
-                  <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-stage">
-                    <User className="h-3.5 w-3.5" aria-hidden="true" />
-                    {playingItem.requested_by || "Invitado"}
-                  </p>
-                </div>
-              ) : (
-                <p className="mt-2 rounded-xl bg-canvas/60 px-3.5 py-3 text-sm text-ink-muted">
-                  Sin canción en reproducción
-                </p>
-              )}
-            </div>
-
-            {/* Lista numerada de pendientes */}
-            <div className="mt-5 flex-1 overflow-y-auto pr-1">
-              <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-                Siguientes ({pendingItems.length})
-              </p>
-
-              {pendingItems.length === 0 ? (
-                <div className="mt-2 rounded-xl border border-dashed border-white/10 bg-canvas/40 px-4 py-6 text-center text-sm text-ink-muted">
-                  La fila está vacía. Pide una canción desde el QR o pulsa{" "}
-                  <strong className="text-ink">+ Agregar</strong>.
-                </div>
-              ) : (
-                <ol className="mt-2 space-y-2">
-                  {pendingItems.map((item, idx) => {
-                    const isBusy = busyActionId === item.id;
-                    return (
-                      <li
-                        key={item.id}
-                        className="rounded-xl border border-white/10 bg-canvas/75 p-3 transition-colors hover:border-white/20"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 items-start gap-2.5">
-                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-xs font-bold text-stage">
-                              {idx + 1}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
-                                {item.title}
-                              </p>
-                              {item.artist && (
-                                <p className="truncate text-xs text-ink-secondary">
-                                  {item.artist}
-                                </p>
-                              )}
-                              <p className="mt-1 text-xs font-medium text-ink-muted">
-                                🎤 {item.requested_by || "Invitado"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Controles del anfitrión ↑ ↓ ▶ ✕ */}
-                        <div className="mt-2.5 flex items-center justify-end gap-1.5 border-t border-white/5 pt-2">
-                          <button
-                            type="button"
-                            disabled={isBusy || idx === 0}
-                            onClick={() => handleItemAction(item.id, "up")}
-                            title="Subir en la cola"
-                            aria-label={`Subir ${item.title}`}
-                            className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary transition-colors hover:bg-elevated hover:text-ink disabled:opacity-30"
-                          >
-                            <ArrowUp className="h-4 w-4" aria-hidden="true" />
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isBusy || idx === pendingItems.length - 1}
-                            onClick={() => handleItemAction(item.id, "down")}
-                            title="Bajar en la cola"
-                            aria-label={`Bajar ${item.title}`}
-                            className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary transition-colors hover:bg-elevated hover:text-ink disabled:opacity-30"
-                          >
-                            <ArrowDown className="h-4 w-4" aria-hidden="true" />
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() =>
-                              handleItemAction(item.id, "play-now")
-                            }
-                            title="Reproducir ahora"
-                            aria-label={`Reproducir ahora ${item.title}`}
-                            className="rounded-lg border border-stage/30 bg-stage/10 p-1.5 text-stage transition-colors hover:bg-stage/20 disabled:opacity-30"
-                          >
-                            <Play className="h-4 w-4" aria-hidden="true" />
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => handleItemAction(item.id, "remove")}
-                            title="Eliminar de la cola"
-                            aria-label={`Eliminar ${item.title}`}
-                            className="rounded-lg border border-live/25 bg-live/10 p-1.5 text-live transition-colors hover:bg-live/20 disabled:opacity-30"
-                          >
-                            <X className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
-
-              {/* Sección colapsable "Ya sonaron" */}
-              <div className="mt-5 border-t border-white/10 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowHistory((prev) => !prev)}
-                  className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-widest text-ink-muted hover:text-ink-secondary"
-                >
-                  <span>Ya sonaron ({historyItems.length})</span>
-                  {showHistory ? (
-                    <ChevronUp className="h-4 w-4" aria-hidden="true" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                  )}
-                </button>
-
-                {showHistory && (
-                  <ul className="mt-2.5 space-y-1.5">
-                    {historyItems.length === 0 ? (
-                      <li className="text-xs text-ink-muted">
-                        Todavía no ha terminado ninguna canción.
-                      </li>
+                {isActive ? (
+                  <button
+                    type="button"
+                    onClick={handleCloseSession}
+                    disabled={closing}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-live/30 bg-live/10 px-4 py-2.5 text-sm font-semibold text-live transition-colors hover:bg-live/20 disabled:opacity-50"
+                  >
+                    {closing ? (
+                      <>
+                        <Loader2
+                          className="h-4 w-4 animate-spin"
+                          aria-hidden="true"
+                        />
+                        Cerrando...
+                      </>
                     ) : (
-                      historyItems.map((item) => (
-                        <li
-                          key={item.id}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-canvas/50 px-3 py-2 text-xs text-ink-muted"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-ink-secondary">
-                              {item.title}
-                            </p>
-                            <p className="truncate">
-                              {item.requested_by || "Invitado"}
-                            </p>
-                          </div>
-                          <span className="shrink-0 rounded bg-elevated px-1.5 py-0.5 text-[10px]">
-                            {item.status === "skipped" ? "Saltada" : "Sonó"}
-                          </span>
-                        </li>
-                      ))
+                      <>
+                        <PowerOff className="h-4 w-4" aria-hidden="true" />
+                        Cerrar sesión
+                      </>
                     )}
-                  </ul>
+                  </button>
+                ) : (
+                  <div className="rounded-xl border border-live/30 bg-live/10 px-4 py-2.5 text-center text-sm font-semibold text-live">
+                    Esta sesión terminó
+                  </div>
                 )}
               </div>
-            </div>
-          </aside>
+            </aside>
+          </div>
 
-          {/* COLUMNA CENTRAL — Reproductor YouTube 16:9 + Controles grandes */}
+          {/* COLUMNA DERECHA — Reproductor YouTube 16:9 a ancho máximo + Controles grandes */}
           <main
             className={`order-1 flex min-w-0 flex-1 flex-col gap-5 lg:order-2 ${
-              !showQueueDrawer && !showQrDrawer ? "mx-auto w-full max-w-[1380px]" : ""
+              !showQueueDrawer && !showQrDrawer ? "mx-auto w-full max-w-[1440px]" : ""
             }`}
           >
             <YouTubeKaraokePlayer
@@ -791,99 +969,12 @@ export function HostScreenClient({
                     className="flex items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-elevated px-5 py-4 text-base font-bold text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Maximize2 className="h-5 w-5 text-stage" aria-hidden="true" />
-                    Pantalla completa
+                    Solo video
                   </button>
                 </div>
               </div>
             </section>
           </main>
-
-          {/* DRAWER DERECHO — Panel de la sesión + QR */}
-          <aside
-            aria-label="Panel de sesión y código QR"
-            className={`surface-card order-3 flex-col justify-between gap-6 rounded-2xl p-6 lg:w-[320px] lg:shrink-0 xl:w-[350px] ${
-              showQrDrawer ? "flex" : "hidden"
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-lg border border-white/10 bg-canvas px-2.5 py-1 font-mono text-xs font-semibold text-stage">
-                    {code}
-                  </span>
-                  <span className="rounded-lg bg-elevated px-2.5 py-1 text-xs font-semibold text-ink-secondary">
-                    {totalInQueue}{" "}
-                    {totalInQueue === 1 ? "en cola" : "en cola"}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowQrDrawer(false)}
-                  title="Recoger panel QR"
-                  aria-label="Recoger panel QR"
-                  className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
-                >
-                  <PanelRightClose className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-ink">
-                {name}
-              </h2>
-
-              <div className="mt-6">
-                <SessionQrCard
-                  code={code}
-                  name={name}
-                  initialPublicUrl={publicUrl}
-                  initialQrDataUrl={qrDataUrl}
-                  compact
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 border-t border-white/10 pt-5">
-              {isActive && (
-                <button
-                  type="button"
-                  onClick={() => setShowSearchModal(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-surface px-4 py-3 text-sm font-semibold text-ink transition-colors hover:border-white/20 hover:bg-elevated"
-                >
-                  <Search className="h-4 w-4 text-stage" aria-hidden="true" />
-                  Buscar y agregar canción
-                </button>
-              )}
-
-              {isActive ? (
-                <button
-                  type="button"
-                  onClick={handleCloseSession}
-                  disabled={closing}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-live/30 bg-live/10 px-4 py-3 text-sm font-semibold text-live transition-colors hover:bg-live/20 disabled:opacity-50"
-                >
-                  {closing ? (
-                    <>
-                      <Loader2
-                        className="h-4 w-4 animate-spin"
-                        aria-hidden="true"
-                      />
-                      Cerrando...
-                    </>
-                  ) : (
-                    <>
-                      <PowerOff className="h-4 w-4" aria-hidden="true" />
-                      Cerrar sesión
-                    </>
-                  )}
-                </button>
-              ) : (
-                <div className="rounded-xl border border-live/30 bg-live/10 px-4 py-3 text-center text-sm font-semibold text-live">
-                  Esta sesión terminó
-                </div>
-              )}
-            </div>
-          </aside>
         </div>
       </div>
 
