@@ -84,6 +84,6 @@ export const config = {
      * Protege todas las rutas excepto archivos estáticos internos de Next.js
      * y recursos públicos con extensión (favicon, imágenes, etc.).
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };

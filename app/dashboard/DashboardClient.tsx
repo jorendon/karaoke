@@ -13,6 +13,7 @@ import {
   PowerOff,
   QrCode,
   Radio,
+  Smartphone,
   Tv,
   X,
 } from "lucide-react";
@@ -387,7 +388,19 @@ export function DashboardClient({
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-stage px-4 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-stage-hover"
                   >
                     <Tv className="h-4 w-4" aria-hidden="true" />
-                    Abrir pantalla
+                    Pantalla TV
+                  </Link>
+
+                  <Link
+                    href={`/remote/${session.code}`}
+                    title="Controlar la TV desde tu celular"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3.5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-white/20 hover:bg-elevated"
+                  >
+                    <Smartphone
+                      className="h-4 w-4 text-stage"
+                      aria-hidden="true"
+                    />
+                    Control
                   </Link>
 
                   <button

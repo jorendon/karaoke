@@ -12,13 +12,17 @@ import {
   type SessionTokenPayload,
 } from "@/lib/auth/jwt";
 
-export function attachSessionCookie(response: NextResponse, token: string) {
+export function attachSessionCookie(
+  response: NextResponse,
+  token: string,
+  maxAgeSeconds = SESSION_MAX_AGE_SECONDS
+) {
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
+    maxAge: maxAgeSeconds,
   });
 }
 
@@ -33,13 +37,17 @@ export function clearSessionCookie(response: NextResponse) {
 }
 
 export async function createSessionTokenForUser(
-  user: Pick<PublicAppUser, "id" | "username" | "role">
+  user: Pick<PublicAppUser, "id" | "username" | "role">,
+  maxAgeSeconds = SESSION_MAX_AGE_SECONDS
 ): Promise<string> {
-  return signSessionToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-  });
+  return signSessionToken(
+    {
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+    },
+    maxAgeSeconds
+  );
 }
 
 export async function getSessionPayload(): Promise<SessionTokenPayload | null> {

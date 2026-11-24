@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Karaoke en Casa</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #0b0b0e;
+        color: #f6f4ef;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .box {
+        padding: 32px;
+      }
+      img {
+        width: 120px;
+        height: 120px;
+        border-radius: 28px;
+      }
+      h1 {
+        margin: 20px 0 8px;
+        font-size: 32px;
+      }
+      p {
+        margin: 0;
+        color: #a4a199;
+        font-size: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <img src="icon.png" alt="Karaoke en Casa" />
+      <h1>Karaoke en Casa</h1>
+      <p id="status">Abriendo karaoke.jrendon.dev...</p>
+    </div>
+    <script>
+      (function () {
+        // Registrar teclas multimedia de control remoto Samsung TV si la API Tizen existe
+        try {
+          if (
+            window.tizen &&
+            window.tizen.tvinputdevice &&
+            window.tizen.tvinputdevice.registerKeyBatch
+          ) {
+            window.tizen.tvinputdevice.registerKeyBatch([
+              "MediaPlayPause",
+              "MediaPlay",
+              "MediaPause",
+              "MediaFastForward",
+              "MediaTrackNext",
+            ]);
+          }
+        } catch (_) {}
+
+        window.location.replace("https://karaoke.jrendon.dev/dashboard");
+      })();
+    </script>
+  </body>
+</html>

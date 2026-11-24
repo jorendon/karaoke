@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { verifyDummyPassword, verifyPassword } from "@/lib/auth/password";
 import {
+  SESSION_MAX_AGE_SECONDS,
+  SESSION_REMEMBER_MAX_AGE_SECONDS,
+} from "@/lib/auth/jwt";
+import {
   attachSessionCookie,
   createSessionTokenForUser,
 } from "@/lib/auth/session";
@@ -10,7 +14,7 @@ import type { AppUser } from "@/lib/database.types";
 const INVALID_CREDENTIALS_MESSAGE = "Usuario o contraseña incorrectos";
 
 export async function POST(request: Request) {
-  let body: { username?: unknown; password?: unknown };
+  let body: { username?: unknown; password?: unknown; rememberMe?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -24,6 +28,10 @@ export async function POST(request: Request) {
     typeof body.username === "string" ? body.username.trim() : "";
   const lowerUsername = trimmedUsername.toLowerCase();
   const rawPassword = typeof body.password === "string" ? body.password : "";
+  const rememberMe = body.rememberMe === true;
+  const maxAgeSeconds = rememberMe
+    ? SESSION_REMEMBER_MAX_AGE_SECONDS
+    : SESSION_MAX_AGE_SECONDS;
 
   if (!trimmedUsername || !rawPassword) {
     return NextResponse.json(
@@ -72,11 +80,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const token = await createSessionTokenForUser({
-      id: user.id,
-      username: user.username,
-      role: user.role,
-    });
+    const token = await createSessionTokenForUser(
+      {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+      maxAgeSeconds
+    );
 
     const response = NextResponse.json({
       user: {
@@ -89,7 +100,7 @@ export async function POST(request: Request) {
       },
     });
 
-    attachSessionCookie(response, token);
+    attachSessionCookie(response, token, maxAgeSeconds);
     return response;
   } catch {
     return NextResponse.json(

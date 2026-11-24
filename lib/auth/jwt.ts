@@ -2,7 +2,8 @@ import { SignJWT, jwtVerify } from "jose";
 import type { UserRole } from "@/lib/database.types";
 
 export const SESSION_COOKIE_NAME = "karaoke_session";
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 días
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 días por defecto
+export const SESSION_REMEMBER_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 días (ideal para TV)
 
 export interface SessionTokenPayload {
   userId: string;
@@ -21,7 +22,8 @@ function getSecretKey(): Uint8Array {
 }
 
 export async function signSessionToken(
-  payload: SessionTokenPayload
+  payload: SessionTokenPayload,
+  maxAgeSeconds = SESSION_MAX_AGE_SECONDS
 ): Promise<string> {
   return new SignJWT({
     userId: payload.userId,
@@ -30,7 +32,7 @@ export async function signSessionToken(
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
+    .setExpirationTime(`${maxAgeSeconds}s`)
     .sign(getSecretKey());
 }
 

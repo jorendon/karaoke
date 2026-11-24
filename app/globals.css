@@ -80,3 +80,12 @@ body {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
+
+/* Foco nítido para navegación con control remoto de Smart TV */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent-amber);
+  outline-offset: 2px;
+}

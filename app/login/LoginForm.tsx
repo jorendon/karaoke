@@ -9,6 +9,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -30,6 +31,7 @@ export function LoginForm() {
         body: JSON.stringify({
           username: username.trim(),
           password,
+          rememberMe,
         }),
       });
 
@@ -126,6 +128,16 @@ export function LoginForm() {
           </button>
         </div>
       </div>
+
+      <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ink-secondary">
+        <input
+          type="checkbox"
+          checked={rememberMe}
+          onChange={(e) => setRememberMe(e.target.checked)}
+          className="h-4 w-4 rounded border-white/20 bg-canvas accent-stage"
+        />
+        <span>Mantener sesión iniciada 30 días (ideal para TV)</span>
+      </label>
 
       <button
         type="submit"

@@ -30,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 import type { QueueItem, Song } from "@/lib/database.types";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useSessionQueueRealtime } from "@/hooks/useSessionQueueRealtime";
 import {
   YouTubeKaraokePlayer,
@@ -167,6 +168,103 @@ export function HostScreenClient({
     },
     [advanceQueue, showToast]
   );
+
+  // Escuchar comandos enviados desde el control remoto móvil (/remote/[code])
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`karaoke-remote-${sessionId}`)
+      .on("broadcast", { event: "remote-command" }, ({ payload }) => {
+        const command = (payload as { command?: string } | null)?.command;
+        if (!command) return;
+
+        if (command === "toggle-play") {
+          playerRef.current?.togglePlayPause();
+        } else if (command === "play") {
+          playerRef.current?.play();
+        } else if (command === "pause") {
+          playerRef.current?.pause();
+        } else if (command === "toggle-queue") {
+          setShowQueueDrawer((prev) => !prev);
+        } else if (command === "toggle-qr") {
+          setShowQrDrawer((prev) => !prev);
+        } else if (command === "cinema-mode") {
+          setShowQueueDrawer(false);
+          setShowQrDrawer(false);
+        } else if (command === "show-panels") {
+          setShowQueueDrawer(true);
+          setShowQrDrawer(true);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [sessionId]);
+
+  // Atajos de teclado y botones multimedia del control remoto Samsung TV (Tizen)
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") {
+        return;
+      }
+
+      const key = event.key;
+      const codeNum = event.keyCode;
+
+      // Play / Pause (control Samsung TV: 415 Play, 19 Pause, 10252 PlayPause)
+      if (
+        key === "MediaPlayPause" ||
+        key === "MediaPlay" ||
+        key === "MediaPause" ||
+        codeNum === 415 ||
+        codeNum === 19 ||
+        codeNum === 10252 ||
+        (key === " " && !showSearchModal)
+      ) {
+        event.preventDefault();
+        playerRef.current?.togglePlayPause();
+        return;
+      }
+
+      // Siguiente canción (MediaTrackNext, MediaFastForward 417, tecla N)
+      if (
+        key === "MediaTrackNext" ||
+        key === "MediaFastForward" ||
+        codeNum === 417 ||
+        key === "n" ||
+        key === "N"
+      ) {
+        event.preventDefault();
+        void advanceQueue("played");
+        return;
+      }
+
+      if (key === "f" || key === "F") {
+        event.preventDefault();
+        playerRef.current?.requestFullscreen();
+      } else if (key === "q" || key === "Q") {
+        event.preventDefault();
+        setShowQrDrawer((prev) => !prev);
+      } else if (key === "c" || key === "C") {
+        event.preventDefault();
+        setShowQueueDrawer((prev) => !prev);
+      } else if (key === "m" || key === "M") {
+        event.preventDefault();
+        setShowQueueDrawer((prevQ) => {
+          const next = !(prevQ || showQrDrawer);
+          setShowQrDrawer(next);
+          return next;
+        });
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [advanceQueue, showQrDrawer, showSearchModal]);
 
   async function handleItemAction(
     itemId: string,
