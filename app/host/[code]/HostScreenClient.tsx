@@ -10,7 +10,9 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Disc3,
   Expand,
+  Flame,
   ListMusic,
   Loader2,
   Maximize2,
@@ -18,6 +20,7 @@ import {
   Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
+  PartyPopper,
   Pause,
   Play,
   Plus,
@@ -40,6 +43,8 @@ import {
 } from "@/components/YouTubeKaraokePlayer";
 import { SessionQrCard } from "@/components/SessionQrCard";
 import { CatalogSearchWidget } from "@/components/CatalogSearchWidget";
+import { SoundEqualizer } from "@/components/SoundEqualizer";
+import { PartyBurst } from "@/components/PartyBurst";
 
 interface HostScreenClientProps {
   sessionId: string;
@@ -91,7 +96,9 @@ export function HostScreenClient({
   const [showQueueDrawer, setShowQueueDrawer] = useState(true);
   const [showQrDrawer, setShowQrDrawer] = useState(true);
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
+  const [burstKey, setBurstKey] = useState(0);
   const [hostRequestName, setHostRequestName] = useState(hostDisplayName);
+  const previousPlayingIdRef = useRef<string | null>(playingItem?.id ?? null);
   const [toast, setToast] = useState<{
     type: "info" | "error" | "success";
     text: string;
@@ -103,6 +110,17 @@ export function HostScreenClient({
     },
     []
   );
+
+  // Celebrar suavemente cada vez que arranca un nuevo cantante en el escenario
+  useEffect(() => {
+    const currentId = playingItem?.id ?? null;
+    if (currentId && previousPlayingIdRef.current !== currentId) {
+      if (previousPlayingIdRef.current !== null) {
+        setBurstKey((prev) => prev + 1);
+      }
+    }
+    previousPlayingIdRef.current = currentId;
+  }, [playingItem?.id]);
 
   useEffect(() => {
     if (!toast) return;
@@ -441,19 +459,20 @@ export function HostScreenClient({
 
   return (
     <div className="min-h-dvh bg-canvas px-4 py-4 sm:px-6 lg:px-8">
+      <PartyBurst triggerKey={burstKey} />
       <div className="mx-auto max-w-[1720px]">
         {/* Barra superior */}
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-surface px-3.5 py-2 text-sm font-medium text-ink-secondary transition-colors hover:border-white/20 hover:bg-elevated hover:text-ink"
+              className="btn-party inline-flex items-center gap-2 rounded-xl border border-white/10 bg-surface px-3.5 py-2 text-sm font-medium text-ink-secondary hover:border-white/20 hover:bg-elevated hover:text-ink"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Dashboard
             </Link>
             <div className="hidden items-center gap-2 sm:flex">
-              <Mic2 className="h-5 w-5 text-stage" aria-hidden="true" />
+              <PartyPopper className="h-5 w-5 text-stage" aria-hidden="true" />
               <span className="text-lg font-bold tracking-tight text-ink">
                 {name}
               </span>
@@ -466,7 +485,7 @@ export function HostScreenClient({
               onClick={() => setShowQueueDrawer((prev) => !prev)}
               aria-pressed={showQueueDrawer}
               title={showQueueDrawer ? "Recoger cola" : "Mostrar cola"}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`btn-party inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold ${
                 showQueueDrawer
                   ? "border-stage/40 bg-stage/15 text-stage"
                   : "border-white/10 bg-surface text-ink-secondary hover:border-white/20 hover:bg-elevated hover:text-ink"
@@ -485,7 +504,7 @@ export function HostScreenClient({
               onClick={() => setShowQrDrawer((prev) => !prev)}
               aria-pressed={showQrDrawer}
               title={showQrDrawer ? "Recoger QR" : "Mostrar QR"}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`btn-party inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold ${
                 showQrDrawer
                   ? "border-stage/40 bg-stage/15 text-stage"
                   : "border-white/10 bg-surface text-ink-secondary hover:border-white/20 hover:bg-elevated hover:text-ink"
@@ -508,7 +527,7 @@ export function HostScreenClient({
                   setShowQrDrawer(false);
                 }}
                 title="Recoger ambos paneles para ampliar el video"
-                className="hidden items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-white/20 hover:bg-elevated hover:text-ink sm:inline-flex"
+                className="btn-party hidden items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:border-white/20 hover:bg-elevated hover:text-ink sm:inline-flex"
               >
                 <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
                 Ampliar video
@@ -521,7 +540,7 @@ export function HostScreenClient({
                   setShowQrDrawer(true);
                 }}
                 title="Mostrar cola y QR"
-                className="hidden items-center gap-1.5 rounded-xl border border-stage/40 bg-stage/15 px-3 py-1.5 text-xs font-semibold text-stage transition-colors hover:bg-stage/25 sm:inline-flex"
+                className="btn-party hidden items-center gap-1.5 rounded-xl border border-stage/40 bg-stage/15 px-3 py-1.5 text-xs font-semibold text-stage hover:bg-stage/25 sm:inline-flex"
               >
                 Mostrar paneles
               </button>
@@ -536,7 +555,7 @@ export function HostScreenClient({
                   ? "Salir de pantalla completa (mostrar barra del navegador)"
                   : "Ampliar app completa en la pantalla (oculta barra del navegador)"
               }
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`btn-party inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold ${
                 isAppFullscreen
                   ? "border-stage/40 bg-stage/15 text-stage"
                   : "border-white/15 bg-elevated text-ink hover:border-stage/40 hover:bg-hover"
@@ -562,7 +581,10 @@ export function HostScreenClient({
                   : "bg-elevated text-ink-secondary"
               }`}
             >
-              <Radio className="h-3.5 w-3.5" aria-hidden="true" />
+              <Radio
+                className={`h-3.5 w-3.5 ${connected ? "animate-pulse" : ""}`}
+                aria-hidden="true"
+              />
               {connected ? "En vivo" : "Conectando..."}
             </span>
 
@@ -578,7 +600,7 @@ export function HostScreenClient({
         {toast && (
           <div
             role="status"
-            className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
+            className={`animate-toast-in mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
               toast.type === "error"
                 ? "border-live/30 bg-live/15 text-live"
                 : toast.type === "success"
@@ -633,10 +655,13 @@ export function HostScreenClient({
                     <button
                       type="button"
                       disabled={shuffling}
-                      onClick={() => void handleShuffleQueue()}
+                      onClick={() => {
+                        setBurstKey((prev) => prev + 1);
+                        void handleShuffleQueue();
+                      }}
                       title="Mezclar turnos al azar (sin repetir cantante seguido)"
                       aria-label="Mezclar cola por turnos justos"
-                      className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-secondary transition-colors hover:border-stage/40 hover:bg-elevated hover:text-ink disabled:opacity-40"
+                      className="btn-party inline-flex items-center gap-1 rounded-lg border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-secondary hover:border-stage/40 hover:bg-elevated hover:text-ink disabled:opacity-40"
                     >
                       {shuffling ? (
                         <Loader2
@@ -655,7 +680,7 @@ export function HostScreenClient({
                     <button
                       type="button"
                       onClick={() => setShowSearchModal(true)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-stage px-3 py-1.5 text-xs font-bold text-canvas transition-colors hover:bg-stage-hover"
+                      className="btn-party inline-flex items-center gap-1 rounded-lg bg-stage px-3 py-1.5 text-xs font-bold text-canvas hover:bg-stage-hover"
                     >
                       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                       Agregar
@@ -666,7 +691,7 @@ export function HostScreenClient({
                     onClick={() => setShowQueueDrawer(false)}
                     title="Recoger cola"
                     aria-label="Recoger panel de cola"
-                    className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
+                    className="btn-party rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted hover:bg-elevated hover:text-ink"
                   >
                     <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -675,11 +700,12 @@ export function HostScreenClient({
 
               {/* Ahora suena */}
               <div className="mt-4">
-                <p className="text-xs font-semibold uppercase tracking-widest text-stage">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-stage">
+                  <SoundEqualizer active={Boolean(playingItem && isVideoPlaying)} size="sm" />
                   Ahora suena
                 </p>
                 {playingItem ? (
-                  <div className="mt-2 rounded-xl border border-stage/30 bg-stage/10 p-3.5">
+                  <div className="animate-queue-in mt-2 rounded-xl border border-stage/30 bg-stage/10 p-3.5">
                     <p className="line-clamp-2 text-base font-bold leading-snug text-ink">
                       {playingItem.title}
                     </p>
@@ -689,7 +715,7 @@ export function HostScreenClient({
                       </p>
                     )}
                     <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-stage">
-                      <User className="h-3.5 w-3.5" aria-hidden="true" />
+                      <Flame className="h-3.5 w-3.5" aria-hidden="true" />
                       {playingItem.requested_by || "Invitado"}
                     </p>
                   </div>
@@ -712,22 +738,31 @@ export function HostScreenClient({
 
                 {pendingItems.length === 0 ? (
                   <div className="mt-2 rounded-xl border border-dashed border-white/10 bg-canvas/40 px-4 py-6 text-center text-sm text-ink-muted">
-                    La fila está vacía. Pide una canción desde el QR o pulsa{" "}
+                    La fila está vacía 🎶 Pide una canción desde el QR o pulsa{" "}
                     <strong className="text-ink">+ Agregar</strong>.
                   </div>
                 ) : (
                   <ol className="mt-2 space-y-2">
                     {pendingItems.map((item, idx) => {
                       const isBusy = busyActionId === item.id;
+                      const medal =
+                        idx === 0
+                          ? "🥇"
+                          : idx === 1
+                            ? "🥈"
+                            : idx === 2
+                              ? "🥉"
+                              : null;
+
                       return (
                         <li
                           key={item.id}
-                          className="rounded-xl border border-white/10 bg-canvas/75 p-3 transition-colors hover:border-white/20"
+                          className="animate-queue-in rounded-xl border border-white/10 bg-canvas/75 p-3 transition-colors hover:border-white/20"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex min-w-0 items-start gap-2.5">
-                              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-xs font-bold text-stage">
-                                {idx + 1}
+                              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-elevated font-mono text-xs font-bold text-stage">
+                                {medal ?? idx + 1}
                               </span>
                               <div className="min-w-0">
                                 <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
@@ -753,7 +788,7 @@ export function HostScreenClient({
                               onClick={() => handleItemAction(item.id, "up")}
                               title="Subir en la cola"
                               aria-label={`Subir ${item.title}`}
-                              className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary transition-colors hover:bg-elevated hover:text-ink disabled:opacity-30"
+                              className="btn-party rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-30"
                             >
                               <ArrowUp className="h-4 w-4" aria-hidden="true" />
                             </button>
@@ -764,7 +799,7 @@ export function HostScreenClient({
                               onClick={() => handleItemAction(item.id, "down")}
                               title="Bajar en la cola"
                               aria-label={`Bajar ${item.title}`}
-                              className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary transition-colors hover:bg-elevated hover:text-ink disabled:opacity-30"
+                              className="btn-party rounded-lg border border-white/10 bg-surface p-1.5 text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-30"
                             >
                               <ArrowDown className="h-4 w-4" aria-hidden="true" />
                             </button>
@@ -777,7 +812,7 @@ export function HostScreenClient({
                               }
                               title="Reproducir ahora"
                               aria-label={`Reproducir ahora ${item.title}`}
-                              className="rounded-lg border border-stage/30 bg-stage/10 p-1.5 text-stage transition-colors hover:bg-stage/20 disabled:opacity-30"
+                              className="btn-party rounded-lg border border-stage/30 bg-stage/10 p-1.5 text-stage hover:bg-stage/20 disabled:opacity-30"
                             >
                               <Play className="h-4 w-4" aria-hidden="true" />
                             </button>
@@ -788,7 +823,7 @@ export function HostScreenClient({
                               onClick={() => handleItemAction(item.id, "remove")}
                               title="Eliminar de la cola"
                               aria-label={`Eliminar ${item.title}`}
-                              className="rounded-lg border border-live/25 bg-live/10 p-1.5 text-live transition-colors hover:bg-live/20 disabled:opacity-30"
+                              className="btn-party rounded-lg border border-live/25 bg-live/10 p-1.5 text-live hover:bg-live/20 disabled:opacity-30"
                             >
                               <X className="h-4 w-4" aria-hidden="true" />
                             </button>
@@ -869,7 +904,7 @@ export function HostScreenClient({
                     onClick={() => setShowQrDrawer(false)}
                     title="Recoger panel QR"
                     aria-label="Recoger panel QR"
-                    className="rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted transition-colors hover:bg-elevated hover:text-ink"
+                    className="btn-party rounded-lg border border-white/10 bg-surface p-1.5 text-ink-muted hover:bg-elevated hover:text-ink"
                   >
                     <ChevronUp className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -891,7 +926,7 @@ export function HostScreenClient({
                   <button
                     type="button"
                     onClick={() => setShowSearchModal(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-white/20 hover:bg-elevated"
+                    className="btn-party flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-sm font-semibold text-ink hover:border-white/20 hover:bg-elevated"
                   >
                     <Search className="h-4 w-4 text-stage" aria-hidden="true" />
                     Buscar y agregar canción
@@ -903,7 +938,7 @@ export function HostScreenClient({
                     type="button"
                     onClick={handleCloseSession}
                     disabled={closing}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-live/30 bg-live/10 px-4 py-2.5 text-sm font-semibold text-live transition-colors hover:bg-live/20 disabled:opacity-50"
+                    className="btn-party flex w-full items-center justify-center gap-2 rounded-xl border border-live/30 bg-live/10 px-4 py-2.5 text-sm font-semibold text-live hover:bg-live/20 disabled:opacity-50"
                   >
                     {closing ? (
                       <>
@@ -922,7 +957,7 @@ export function HostScreenClient({
                   </button>
                 ) : (
                   <div className="rounded-xl border border-live/30 bg-live/10 px-4 py-2.5 text-center text-sm font-semibold text-live">
-                    Esta sesión terminó
+                    Esta sesión terminó 🎤
                   </div>
                 )}
               </div>
@@ -950,11 +985,21 @@ export function HostScreenClient({
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 xl:items-stretch">
                   {/* Quién está cantando ahora */}
                   <div className="flex flex-col justify-center rounded-2xl border border-stage/25 bg-canvas/70 p-4 sm:p-5 xl:col-span-7">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-stage/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-stage">
-                        <Mic2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-stage/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-stage">
+                        {playingItem ? (
+                          <Disc3
+                            className={`h-4 w-4 ${isVideoPlaying ? "animate-spin-slow" : ""}`}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Mic2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
                         {playingItem ? "Cantando ahora" : "En espera"}
                       </span>
+                      {playingItem && (
+                        <SoundEqualizer active={isVideoPlaying} size="md" />
+                      )}
                     </div>
 
                     {playingItem ? (
@@ -966,6 +1011,9 @@ export function HostScreenClient({
                           />
                           <span className="truncate">
                             {playingItem.requested_by || "Invitado"}
+                          </span>
+                          <span aria-hidden="true" className="text-2xl">
+                            🎤
                           </span>
                         </p>
                         <h1 className="mt-1.5 line-clamp-2 text-lg font-bold leading-snug text-ink sm:text-xl lg:text-2xl">
@@ -984,7 +1032,7 @@ export function HostScreenClient({
                         </h1>
                         <p className="mt-1 text-sm text-ink-secondary sm:text-base">
                           Agrega canciones desde el QR para iniciar el
-                          espectáculo
+                          espectáculo 🎉
                         </p>
                       </>
                     )}
@@ -1001,7 +1049,7 @@ export function HostScreenClient({
                         ¡Prepárate! Siguiente en cantar
                       </p>
                       <p className="neon-next-name mt-2 truncate text-2xl font-black uppercase tracking-wide sm:text-3xl lg:text-4xl">
-                        {pendingItems[0].requested_by || "Invitado"}
+                        ⚡ {pendingItems[0].requested_by || "Invitado"}
                       </p>
                       <p className="mt-1.5 line-clamp-1 text-sm font-semibold text-cyan-100/90 sm:text-base">
                         🎵 {pendingItems[0].title}
@@ -1013,10 +1061,10 @@ export function HostScreenClient({
                   ) : (
                     <div className="flex flex-col justify-center rounded-2xl border border-dashed border-white/15 bg-canvas/50 p-4 text-center sm:p-5 xl:col-span-5">
                       <p className="text-xs font-bold uppercase tracking-widest text-ink-muted">
-                        Siguiente turno libre
+                        Siguiente turno libre ✨
                       </p>
                       <p className="mt-1.5 text-base font-semibold text-ink-secondary">
-                        ¿Quién se anima a cantar después?
+                        ¿Quién se anima a cantar después? 🎤
                       </p>
                       <p className="mt-1 text-xs text-ink-muted">
                         Escanea el QR para pedir tu canción
@@ -1031,7 +1079,7 @@ export function HostScreenClient({
                     type="button"
                     disabled={!playingItem}
                     onClick={() => playerRef.current?.togglePlayPause()}
-                    className="flex items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-elevated px-5 py-4 text-base font-bold text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn-party flex items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-elevated px-5 py-4 text-base font-bold text-ink hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {isVideoPlaying ? (
                       <>
@@ -1052,7 +1100,7 @@ export function HostScreenClient({
                       advancing || (!playingItem && pendingItems.length === 0)
                     }
                     onClick={() => void advanceQueue("played")}
-                    className="flex items-center justify-center gap-2.5 rounded-2xl bg-stage px-5 py-4 text-base font-bold text-canvas transition-colors hover:bg-stage-hover disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn-party flex items-center justify-center gap-2.5 rounded-2xl bg-stage px-5 py-4 text-base font-bold text-canvas hover:bg-stage-hover disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {advancing ? (
                       <Loader2
@@ -1069,7 +1117,7 @@ export function HostScreenClient({
                     type="button"
                     disabled={!playingItem}
                     onClick={() => playerRef.current?.requestFullscreen()}
-                    className="flex items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-elevated px-5 py-4 text-base font-bold text-ink transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40"
+                    className="btn-party flex items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-elevated px-5 py-4 text-base font-bold text-ink hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Maximize2 className="h-5 w-5 text-stage" aria-hidden="true" />
                     Solo video

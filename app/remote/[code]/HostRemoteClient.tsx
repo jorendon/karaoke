@@ -28,6 +28,8 @@ import type { QueueItem, Song } from "@/lib/database.types";
 import { useSessionQueueRealtime } from "@/hooks/useSessionQueueRealtime";
 import { CatalogSearchWidget } from "@/components/CatalogSearchWidget";
 import { SessionQrCard } from "@/components/SessionQrCard";
+import { SoundEqualizer } from "@/components/SoundEqualizer";
+import { PartyBurst } from "@/components/PartyBurst";
 
 interface HostRemoteClientProps {
   sessionId: string;
@@ -66,6 +68,7 @@ export function HostRemoteClient({
   const [advancing, setAdvancing] = useState(false);
   const [shuffling, setShuffling] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [burstKey, setBurstKey] = useState(0);
   const [feedback, setFeedback] = useState<{
     type: "error" | "success";
     text: string;
@@ -127,7 +130,11 @@ export function HostRemoteClient({
         });
         return;
       }
-      setFeedback({ type: "success", text: "Siguiente canción enviada a la TV" });
+      setBurstKey((prev) => prev + 1);
+      setFeedback({
+        type: "success",
+        text: "🎤 ¡Siguiente canción enviada a la TV!",
+      });
       await refreshQueue();
     } finally {
       setAdvancing(false);
@@ -180,9 +187,10 @@ export function HostRemoteClient({
           message: data.error || "No se pudo agregar la canción.",
         };
       }
+      setBurstKey((prev) => prev + 1);
       setFeedback({
         type: "success",
-        text: `"${song.title}" agregada (#${data.queuePosition ?? 1})`,
+        text: `🎉 "${song.title}" agregada (#${data.queuePosition ?? 1})`,
       });
       await refreshQueue();
       return { ok: true };
@@ -203,7 +211,8 @@ export function HostRemoteClient({
         setFeedback({ type: "error", text: "No se pudo mezclar la cola." });
         return;
       }
-      setFeedback({ type: "success", text: "Cola mezclada por turnos justos" });
+      setBurstKey((prev) => prev + 1);
+      setFeedback({ type: "success", text: "🎲 Cola mezclada por turnos justos" });
       await refreshQueue();
     } finally {
       setShuffling(false);
@@ -232,11 +241,12 @@ export function HostRemoteClient({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 pb-10 pt-4 sm:px-6">
+      <PartyBurst triggerKey={burstKey} />
       {/* Encabezado compacto */}
       <header className="flex items-center justify-between gap-2">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-2 text-xs font-medium text-ink-secondary hover:bg-elevated hover:text-ink"
+          className="btn-party inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-2 text-xs font-medium text-ink-secondary hover:bg-elevated hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Dashboard
@@ -250,13 +260,16 @@ export function HostRemoteClient({
                 : "bg-elevated text-ink-secondary"
             }`}
           >
-            <Radio className="h-3.5 w-3.5" aria-hidden="true" />
+            <Radio
+              className={`h-3.5 w-3.5 ${connected ? "animate-pulse" : ""}`}
+              aria-hidden="true"
+            />
             {connected ? "TV en vivo" : "Conectando..."}
           </span>
 
           <Link
             href={`/host/${code}`}
-            className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:bg-elevated hover:text-ink"
+            className="btn-party inline-flex items-center gap-1 rounded-xl border border-white/10 bg-surface px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:bg-elevated hover:text-ink"
           >
             <Tv className="h-3.5 w-3.5 text-stage" aria-hidden="true" />
             Modo TV
@@ -270,11 +283,12 @@ export function HostRemoteClient({
           <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
           Control remoto del anfitrión · {code}
         </div>
-        <h1 className="mt-1 text-xl font-bold text-ink">{name}</h1>
+        <h1 className="mt-1 text-xl font-bold text-ink">{name} 🎤</h1>
 
         {/* Ahora suena en la TV */}
         <div className="mt-4 rounded-xl border border-stage/25 bg-stage/10 p-3.5">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-stage">
+          <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-stage">
+            <SoundEqualizer active={Boolean(playingItem)} size="sm" />
             Sonando en la TV
           </p>
           {playingItem ? (
@@ -302,10 +316,10 @@ export function HostRemoteClient({
             onClick={() =>
               void sendTvCommand(
                 "toggle-play",
-                "Pausa / Reanudar enviado a la TV"
+                "⏯️ Pausa / Reanudar enviado a la TV"
               )
             }
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-elevated px-4 py-3.5 text-sm font-bold text-ink transition-colors hover:bg-hover disabled:opacity-40"
+            className="btn-party flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-elevated px-4 py-3.5 text-sm font-bold text-ink hover:bg-hover disabled:opacity-40"
           >
             {sendingCmd === "toggle-play" ? (
               <Loader2 className="h-4 w-4 animate-spin text-stage" />
@@ -319,7 +333,7 @@ export function HostRemoteClient({
             type="button"
             disabled={advancing || (!playingItem && pendingItems.length === 0)}
             onClick={() => void handleNextSong()}
-            className="flex items-center justify-center gap-2 rounded-xl bg-stage px-4 py-3.5 text-sm font-bold text-canvas transition-colors hover:bg-stage-hover disabled:opacity-40"
+            className="btn-party flex items-center justify-center gap-2 rounded-xl bg-stage px-4 py-3.5 text-sm font-bold text-canvas hover:bg-stage-hover disabled:opacity-40"
           >
             {advancing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -338,7 +352,7 @@ export function HostRemoteClient({
             onClick={() =>
               void sendTvCommand("toggle-queue", "Panel de cola alternado en TV")
             }
-            className="flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-canvas/70 px-2 py-2.5 text-[11px] font-semibold text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-40"
+            className="btn-party flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-canvas/70 px-2 py-2.5 text-[11px] font-semibold text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-40"
           >
             <PanelLeft className="h-4 w-4 text-stage" aria-hidden="true" />
             Cola TV
@@ -350,7 +364,7 @@ export function HostRemoteClient({
             onClick={() =>
               void sendTvCommand("toggle-qr", "Panel QR alternado en TV")
             }
-            className="flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-canvas/70 px-2 py-2.5 text-[11px] font-semibold text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-40"
+            className="btn-party flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-canvas/70 px-2 py-2.5 text-[11px] font-semibold text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-40"
           >
             <QrCode className="h-4 w-4 text-stage" aria-hidden="true" />
             QR TV
@@ -360,9 +374,9 @@ export function HostRemoteClient({
             type="button"
             disabled={sendingCmd !== null}
             onClick={() =>
-              void sendTvCommand("cinema-mode", "Video ampliado en la TV")
+              void sendTvCommand("cinema-mode", "🎬 Video ampliado en la TV")
             }
-            className="flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-canvas/70 px-2 py-2.5 text-[11px] font-semibold text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-40"
+            className="btn-party flex flex-col items-center justify-center gap-1 rounded-xl border border-white/10 bg-canvas/70 px-2 py-2.5 text-[11px] font-semibold text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-40"
           >
             <Maximize2 className="h-4 w-4 text-stage" aria-hidden="true" />
             Ampliar TV
@@ -373,7 +387,7 @@ export function HostRemoteClient({
       {feedback && (
         <div
           role="status"
-          className={`mt-4 flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
+          className={`animate-toast-in mt-4 flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
             feedback.type === "error"
               ? "border-live/30 bg-live/10 text-live"
               : "border-ok/30 bg-ok/10 text-ok"
@@ -393,7 +407,7 @@ export function HostRemoteClient({
         <button
           type="button"
           onClick={() => setActiveTab("controls")}
-          className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-colors ${
+          className={`btn-party flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold ${
             activeTab === "controls"
               ? "bg-stage text-canvas"
               : "text-ink-secondary hover:text-ink"
@@ -406,7 +420,7 @@ export function HostRemoteClient({
         <button
           type="button"
           onClick={() => setActiveTab("search")}
-          className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-colors ${
+          className={`btn-party flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold ${
             activeTab === "search"
               ? "bg-stage text-canvas"
               : "text-ink-secondary hover:text-ink"
@@ -419,7 +433,7 @@ export function HostRemoteClient({
         <button
           type="button"
           onClick={() => setActiveTab("qr")}
-          className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold transition-colors ${
+          className={`btn-party flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold ${
             activeTab === "qr"
               ? "bg-stage text-canvas"
               : "text-ink-secondary hover:text-ink"
@@ -439,7 +453,7 @@ export function HostRemoteClient({
                 type="button"
                 disabled={shuffling}
                 onClick={() => void handleShuffleQueue()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-canvas/80 px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:border-stage/40 hover:text-ink disabled:opacity-40"
+                className="btn-party inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-canvas/80 px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:border-stage/40 hover:text-ink disabled:opacity-40"
               >
                 {shuffling ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-stage" />
@@ -458,7 +472,7 @@ export function HostRemoteClient({
                 aria-hidden="true"
               />
               <p className="mt-2 text-sm font-medium text-ink">
-                No hay canciones en espera
+                No hay canciones en espera 🎶
               </p>
               <p className="mt-1 text-xs text-ink-secondary">
                 Usa la pestaña Agregar o comparte el QR con los invitados.
@@ -468,14 +482,16 @@ export function HostRemoteClient({
             <ol className="space-y-2.5">
               {pendingItems.map((item, idx) => {
                 const isBusy = busyItemId === item.id;
+                const medal =
+                  idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
                 return (
                   <li
                     key={item.id}
-                    className="rounded-xl border border-white/10 bg-canvas/70 p-3.5"
+                    className="animate-queue-in rounded-xl border border-white/10 bg-canvas/70 p-3.5"
                   >
                     <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-elevated font-mono text-xs font-bold text-stage">
-                        {idx + 1}
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-elevated font-mono text-xs font-bold text-stage">
+                        {medal ?? idx + 1}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold leading-snug text-ink">
@@ -494,7 +510,7 @@ export function HostRemoteClient({
                         disabled={isBusy || idx === 0}
                         onClick={() => handleItemAction(item.id, "up")}
                         aria-label={`Subir ${item.title}`}
-                        className="rounded-lg border border-white/10 bg-surface p-2 text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-30"
+                        className="btn-party rounded-lg border border-white/10 bg-surface p-2 text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-30"
                       >
                         <ArrowUp className="h-4 w-4" aria-hidden="true" />
                       </button>
@@ -504,7 +520,7 @@ export function HostRemoteClient({
                         disabled={isBusy || idx === pendingItems.length - 1}
                         onClick={() => handleItemAction(item.id, "down")}
                         aria-label={`Bajar ${item.title}`}
-                        className="rounded-lg border border-white/10 bg-surface p-2 text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-30"
+                        className="btn-party rounded-lg border border-white/10 bg-surface p-2 text-ink-secondary hover:bg-elevated hover:text-ink disabled:opacity-30"
                       >
                         <ArrowDown className="h-4 w-4" aria-hidden="true" />
                       </button>
@@ -514,7 +530,7 @@ export function HostRemoteClient({
                         disabled={isBusy}
                         onClick={() => handleItemAction(item.id, "play-now")}
                         aria-label={`Reproducir ahora ${item.title}`}
-                        className="rounded-lg border border-stage/30 bg-stage/10 p-2 text-stage hover:bg-stage/20 disabled:opacity-30"
+                        className="btn-party rounded-lg border border-stage/30 bg-stage/10 p-2 text-stage hover:bg-stage/20 disabled:opacity-30"
                       >
                         <Play className="h-4 w-4" aria-hidden="true" />
                       </button>
@@ -524,7 +540,7 @@ export function HostRemoteClient({
                         disabled={isBusy}
                         onClick={() => handleItemAction(item.id, "remove")}
                         aria-label={`Eliminar ${item.title}`}
-                        className="rounded-lg border border-live/25 bg-live/10 p-2 text-live hover:bg-live/20 disabled:opacity-30"
+                        className="btn-party rounded-lg border border-live/25 bg-live/10 p-2 text-live hover:bg-live/20 disabled:opacity-30"
                       >
                         <X className="h-4 w-4" aria-hidden="true" />
                       </button>

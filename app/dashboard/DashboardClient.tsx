@@ -7,8 +7,9 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Disc3,
   Loader2,
-  Mic2,
+  PartyPopper,
   Plus,
   PowerOff,
   QrCode,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import type { Session } from "@/lib/database.types";
 import { SessionQrCard } from "@/components/SessionQrCard";
+import { PartyBurst } from "@/components/PartyBurst";
 import {
   PlaylistsSection,
   type SavedPlaylist,
@@ -52,6 +54,7 @@ export function DashboardClient({
   const [loadingQrCode, setLoadingQrCode] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [qrModal, setQrModal] = useState<QrModalState | null>(null);
+  const [burstKey, setBurstKey] = useState(0);
   const [feedback, setFeedback] = useState<{
     type: "error" | "success";
     text: string;
@@ -98,9 +101,10 @@ export function DashboardClient({
 
       setSessions((prev) => [data.session!, ...prev]);
       setNewName("");
+      setBurstKey((prev) => prev + 1);
       setFeedback({
         type: "success",
-        text: `Sesión "${data.session.name}" creada con código ${data.session.code}.`,
+        text: `🎉 ¡Sesión "${data.session.name}" creada con código ${data.session.code}!`,
       });
 
       if (data.qrDataUrl && data.publicUrl) {
@@ -224,10 +228,11 @@ export function DashboardClient({
 
   return (
     <div className="space-y-8">
+      <PartyBurst triggerKey={burstKey} />
       {feedback && (
         <div
           role="status"
-          className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+          className={`animate-toast-in flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
             feedback.type === "error"
               ? "border-live/30 bg-live/10 text-live"
               : "border-ok/30 bg-ok/10 text-ok"
@@ -248,9 +253,9 @@ export function DashboardClient({
         className="surface-card rounded-2xl p-6 sm:p-7"
       >
         <div className="flex items-center gap-2.5">
-          <Mic2 className="h-5 w-5 text-stage" aria-hidden="true" />
+          <PartyPopper className="h-5 w-5 text-stage" aria-hidden="true" />
           <h2 id="new-session-heading" className="text-lg font-semibold text-ink">
-            Nueva sesión de karaoke
+            Nueva sesión de karaoke 🎤
           </h2>
         </div>
         <p className="mt-1 text-sm text-ink-secondary">
@@ -278,7 +283,7 @@ export function DashboardClient({
           <button
             type="submit"
             disabled={creating}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-stage px-6 py-3 text-sm font-semibold text-canvas transition-colors hover:bg-stage-hover disabled:opacity-60"
+            className="btn-party inline-flex items-center justify-center gap-2 rounded-xl bg-stage px-6 py-3 text-sm font-semibold text-canvas hover:bg-stage-hover disabled:opacity-60"
           >
             {creating ? (
               <>
@@ -302,7 +307,7 @@ export function DashboardClient({
             id="active-sessions-heading"
             className="flex items-center gap-2 text-lg font-semibold text-ink"
           >
-            <Radio className="h-4 w-4 text-ok" aria-hidden="true" />
+            <Radio className="h-4 w-4 animate-pulse text-ok" aria-hidden="true" />
             Sesiones activas ({activeSessions.length})
           </h2>
         </div>
@@ -310,7 +315,7 @@ export function DashboardClient({
         {activeSessions.length === 0 ? (
           <div className="surface-card rounded-2xl p-10 text-center">
             <p className="text-base font-medium text-ink">
-              No tienes ninguna fiesta activa en este momento
+              No tienes ninguna fiesta activa en este momento 🎶
             </p>
             <p className="mt-1 text-sm text-ink-secondary">
               Escribe un nombre arriba y pulsa{" "}
@@ -323,12 +328,16 @@ export function DashboardClient({
             {activeSessions.map((session) => (
               <article
                 key={session.id}
-                className="surface-card flex flex-col justify-between rounded-2xl p-6"
+                className="surface-card animate-queue-in flex flex-col justify-between rounded-2xl p-6"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <span className="inline-flex items-center gap-1.5 rounded-md bg-ok/15 px-2.5 py-0.5 text-xs font-medium text-ok">
+                        <Disc3
+                          className="animate-spin-slow h-3.5 w-3.5"
+                          aria-hidden="true"
+                        />
                         Activa
                       </span>
                       <h3 className="mt-2 text-xl font-bold tracking-tight text-ink">
@@ -351,7 +360,7 @@ export function DashboardClient({
                       })}
                     </span>
                     <span>
-                      {session.activeQueueCount}{" "}
+                      🎵 {session.activeQueueCount}{" "}
                       {session.activeQueueCount === 1
                         ? "canción en cola"
                         : "canciones en cola"}
@@ -365,7 +374,7 @@ export function DashboardClient({
                     <button
                       type="button"
                       onClick={() => handleCopyUrl(session)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-stage hover:bg-elevated"
+                      className="btn-party inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-stage hover:bg-elevated"
                     >
                       {copiedCode === session.code ? (
                         <>
@@ -385,7 +394,7 @@ export function DashboardClient({
                 <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
                   <Link
                     href={`/host/${session.code}`}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-stage px-4 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-stage-hover"
+                    className="btn-party inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-stage px-4 py-2.5 text-sm font-semibold text-canvas hover:bg-stage-hover"
                   >
                     <Tv className="h-4 w-4" aria-hidden="true" />
                     Pantalla TV
@@ -394,7 +403,7 @@ export function DashboardClient({
                   <Link
                     href={`/remote/${session.code}`}
                     title="Controlar la TV desde tu celular"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3.5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-white/20 hover:bg-elevated"
+                    className="btn-party inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3.5 py-2.5 text-sm font-medium text-ink hover:border-white/20 hover:bg-elevated"
                   >
                     <Smartphone
                       className="h-4 w-4 text-stage"
@@ -407,7 +416,7 @@ export function DashboardClient({
                     type="button"
                     onClick={() => handleOpenQr(session)}
                     disabled={loadingQrCode === session.code}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3.5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-white/20 hover:bg-elevated disabled:opacity-50"
+                    className="btn-party inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3.5 py-2.5 text-sm font-medium text-ink hover:border-white/20 hover:bg-elevated disabled:opacity-50"
                   >
                     {loadingQrCode === session.code ? (
                       <Loader2
@@ -424,7 +433,7 @@ export function DashboardClient({
                     type="button"
                     onClick={() => handleCloseSession(session)}
                     disabled={closingCode === session.code}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-live/25 bg-live/10 px-3.5 py-2.5 text-sm font-medium text-live transition-colors hover:bg-live/20 disabled:opacity-50"
+                    className="btn-party inline-flex items-center gap-1.5 rounded-xl border border-live/25 bg-live/10 px-3.5 py-2.5 text-sm font-medium text-live hover:bg-live/20 disabled:opacity-50"
                   >
                     {closingCode === session.code ? (
                       <Loader2

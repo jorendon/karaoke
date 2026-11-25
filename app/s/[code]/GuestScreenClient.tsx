@@ -3,15 +3,19 @@
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
+  Disc3,
   ListMusic,
-  Mic2,
+  PartyPopper,
   Radio,
   Search,
+  Sparkles,
   User,
 } from "lucide-react";
 import type { QueueItem, Song } from "@/lib/database.types";
 import { useSessionQueueRealtime } from "@/hooks/useSessionQueueRealtime";
 import { CatalogSearchWidget } from "@/components/CatalogSearchWidget";
+import { SoundEqualizer } from "@/components/SoundEqualizer";
+import { PartyBurst } from "@/components/PartyBurst";
 
 const GUEST_NAME_STORAGE_KEY = "karaoke_guest_name";
 
@@ -47,6 +51,7 @@ export function GuestScreenClient({
   const [guestName, setGuestName] = useState("");
   const [activeTab, setActiveTab] = useState<"search" | "queue">("search");
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [burstKey, setBurstKey] = useState(0);
 
   useEffect(() => {
     try {
@@ -111,7 +116,8 @@ export function GuestScreenClient({
       }
 
       const pos = data.queuePosition ?? pendingItems.length + 1;
-      setConfirmation(`¡Agregada! Eres el #${pos} en la fila`);
+      setBurstKey((prev) => prev + 1);
+      setConfirmation(`🎉 ¡Agregada! Eres el #${pos} en la fila`);
       void refreshQueue();
       return { ok: true };
     } catch {
@@ -126,16 +132,19 @@ export function GuestScreenClient({
   if (!isActive) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center px-6 py-12 text-center">
-        <div className="surface-card w-full rounded-2xl p-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+        <div className="surface-card animate-toast-in w-full rounded-2xl p-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-stage/15 text-stage">
+            <Sparkles className="h-7 w-7" aria-hidden="true" />
+          </div>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-ink-muted">
             {name}
           </p>
-          <h1 className="mt-3 text-2xl font-bold text-ink">
+          <h1 className="mt-2 text-2xl font-bold text-ink">
             Esta sesión terminó 🎤
           </h1>
           <p className="mt-2 text-sm text-ink-secondary">
-            Gracias por cantar. El anfitrión cerró esta fiesta y ya no se pueden
-            agregar canciones.
+            ¡Gracias por cantar y aplaudir! El anfitrión cerró esta fiesta y ya
+            no se pueden agregar canciones.
           </p>
         </div>
       </main>
@@ -144,18 +153,26 @@ export function GuestScreenClient({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4 pb-10 pt-5 sm:px-6">
+      <PartyBurst triggerKey={burstKey} />
+
       {/* Encabezado de la fiesta */}
       <header className="surface-card rounded-2xl p-5">
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-ok/15 px-2.5 py-1 text-xs font-semibold text-ok">
-            <Radio className="h-3 w-3" aria-hidden="true" />
+            <Radio
+              className={`h-3 w-3 ${connected ? "animate-pulse" : ""}`}
+              aria-hidden="true"
+            />
             {connected ? "En vivo" : "Conectando..."}
           </span>
-          <span className="font-mono text-xs text-ink-muted">#{code}</span>
+          <span className="inline-flex items-center gap-1 font-mono text-xs text-ink-muted">
+            <PartyPopper className="h-3.5 w-3.5 text-stage" aria-hidden="true" />
+            #{code}
+          </span>
         </div>
 
         <h1 className="mt-2.5 text-2xl font-extrabold tracking-tight text-ink">
-          {name}
+          {name} 🎤
         </h1>
 
         {/* Campo obligatorio del nombre del invitado (localStorage) */}
@@ -182,7 +199,7 @@ export function GuestScreenClient({
           />
           {!trimmedName && (
             <p className="mt-1.5 text-xs text-stage">
-              Escribe tu nombre para poder agregar canciones a la cola.
+              ✨ Escribe tu nombre para poder pedir canciones.
             </p>
           )}
         </div>
@@ -192,14 +209,15 @@ export function GuestScreenClient({
       {playingItem && (
         <section
           aria-label="Ahora suena"
-          className="mt-4 flex items-center gap-3 rounded-2xl border border-stage/25 bg-stage/10 px-4 py-3"
+          className="animate-queue-in mt-4 flex items-center gap-3 rounded-2xl border border-stage/25 bg-stage/10 px-4 py-3"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stage/20 text-stage">
-            <Mic2 className="h-5 w-5" aria-hidden="true" />
+            <Disc3 className="animate-spin-slow h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-stage">
-              Ahora suena
+            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-stage">
+              <span>Ahora suena</span>
+              <SoundEqualizer active size="sm" />
             </p>
             <p className="truncate text-sm font-bold text-ink">
               {playingItem.title}
@@ -216,7 +234,7 @@ export function GuestScreenClient({
       {confirmation && (
         <div
           role="status"
-          className="mt-4 flex items-center gap-2.5 rounded-2xl border border-ok/30 bg-ok/15 px-4 py-3.5 text-sm font-semibold text-ok"
+          className="animate-toast-in mt-4 flex items-center gap-2.5 rounded-2xl border border-ok/30 bg-ok/15 px-4 py-3.5 text-sm font-semibold text-ok"
         >
           <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />
           <span>{confirmation}</span>
@@ -228,7 +246,7 @@ export function GuestScreenClient({
         <button
           type="button"
           onClick={() => setActiveTab("search")}
-          className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
+          className={`btn-party flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold ${
             activeTab === "search"
               ? "bg-stage text-canvas"
               : "text-ink-secondary hover:text-ink"
@@ -241,7 +259,7 @@ export function GuestScreenClient({
         <button
           type="button"
           onClick={() => setActiveTab("queue")}
-          className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
+          className={`btn-party flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold ${
             activeTab === "queue"
               ? "bg-stage text-canvas"
               : "text-ink-secondary hover:text-ink"
@@ -279,12 +297,13 @@ export function GuestScreenClient({
           className="surface-card mt-4 space-y-5 rounded-2xl p-5"
         >
           <div>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-stage">
+            <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-stage">
+              <SoundEqualizer active={Boolean(playingItem)} size="sm" />
               Ahora suena
             </h2>
             {playingItem ? (
               <div
-                className={`mt-2 rounded-xl border p-4 ${
+                className={`animate-queue-in mt-2 rounded-xl border p-4 ${
                   isOwnSong(playingItem.requested_by)
                     ? "border-stage/50 bg-stage/15"
                     : "border-white/10 bg-canvas/70"
@@ -304,7 +323,7 @@ export function GuestScreenClient({
                   </span>
                   {isOwnSong(playingItem.requested_by) && (
                     <span className="rounded bg-stage px-1.5 py-0.5 text-[10px] font-bold text-canvas">
-                      ¡Te toca!
+                      ⭐ ¡Te toca!
                     </span>
                   )}
                 </div>
@@ -323,16 +342,18 @@ export function GuestScreenClient({
 
             {pendingItems.length === 0 ? (
               <p className="mt-2 rounded-xl border border-dashed border-white/10 bg-canvas/40 px-4 py-8 text-center text-sm text-ink-muted">
-                No hay canciones en espera. ¡Sé el primero en pedir una!
+                No hay canciones en espera 🎶 ¡Sé el primero en pedir una!
               </p>
             ) : (
               <ol className="mt-2.5 space-y-2">
                 {pendingItems.map((item, idx) => {
                   const mine = isOwnSong(item.requested_by);
+                  const medal =
+                    idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
                   return (
                     <li
                       key={item.id}
-                      className={`flex items-start gap-3 rounded-xl border p-3.5 ${
+                      className={`animate-queue-in flex items-start gap-3 rounded-xl border p-3.5 ${
                         mine
                           ? "border-stage/40 bg-stage/10"
                           : "border-white/10 bg-canvas/70"
@@ -345,7 +366,7 @@ export function GuestScreenClient({
                             : "bg-elevated text-ink-secondary"
                         }`}
                       >
-                        {idx + 1}
+                        {medal ?? idx + 1}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold leading-snug text-ink">
@@ -368,7 +389,7 @@ export function GuestScreenClient({
                           </span>
                           {mine && (
                             <span className="rounded bg-stage/20 px-1.5 py-0.5 text-[10px] font-semibold text-stage">
-                              Tuya
+                              ⭐ Tuya
                             </span>
                           )}
                         </div>

@@ -134,8 +134,140 @@ input:focus-visible {
     0 0 32px rgba(6, 182, 212, 0.45);
 }
 
+/* Ecualizador animado en vivo */
+@keyframes eqBounce {
+  0%,
+  100% {
+    transform: scaleY(0.28);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.eq-bar {
+  transform-origin: bottom center;
+  animation: eqBounce 0.85s ease-in-out infinite;
+}
+
+.eq-bar-paused {
+  transform: scaleY(0.32);
+  transform-origin: bottom center;
+  animation: none;
+}
+
+/* Notas musicales flotantes para el escenario */
+@keyframes floatNote {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-4deg);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateY(-9px) rotate(6deg);
+    opacity: 1;
+  }
+}
+
+.animate-float-note {
+  animation: floatNote 3.2s ease-in-out infinite;
+}
+
+/* Giro suave de vinilo / disco */
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 6s linear infinite;
+}
+
+/* Entrada suave de elementos de la cola y notificaciones */
+@keyframes queueSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-queue-in {
+  animation: queueSlideIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes toastPopIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toastPopIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Explosión ligera de celebración (confeti / notas) */
+@keyframes partyParticle {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.6) rotate(0deg);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 0px), var(--ty, -70px)) scale(1.2)
+      rotate(var(--rot, 25deg));
+  }
+}
+
+.party-particle {
+  animation: partyParticle 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Botones con respuesta táctil divertida */
+.btn-party {
+  transition:
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.btn-party:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-party:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .neon-next-box {
+  .neon-next-box,
+  .eq-bar,
+  .animate-float-note,
+  .animate-spin-slow,
+  .animate-queue-in,
+  .animate-toast-in,
+  .party-particle {
     animation: none;
+  }
+
+  .btn-party:hover:not(:disabled),
+  .btn-party:active:not(:disabled) {
+    transform: none;
   }
 }

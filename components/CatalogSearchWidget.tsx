@@ -275,7 +275,7 @@ export function CatalogSearchWidget({
                   disabled={isAdding || Boolean(disabledReason)}
                   onClick={() => handleAddClick(song)}
                   title={disabledReason || "Agregar a la cola"}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 sm:text-sm ${
+                  className={`btn-party inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45 sm:text-sm ${
                     justAdded
                       ? "bg-ok/20 text-ok"
                       : "bg-stage text-canvas hover:bg-stage-hover"
@@ -292,12 +292,12 @@ export function CatalogSearchWidget({
                   ) : justAdded ? (
                     <>
                       <Check className="h-4 w-4" aria-hidden="true" />
-                      ¡Listo!
+                      ¡Lista! 🎉
                     </>
                   ) : (
                     <>
                       <Plus className="h-4 w-4" aria-hidden="true" />
-                      <span>Agregar</span>
+                      <span>Pedir</span>
                     </>
                   )}
                 </button>

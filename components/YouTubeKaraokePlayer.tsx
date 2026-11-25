@@ -386,15 +386,32 @@ export const YouTubeKaraokePlayer = forwardRef<
       {/* Estado vacío superpuesto cuando no hay canción en reproducción */}
       {!videoId && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-surface to-canvas p-8 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-stage/15 text-stage">
-            <Mic2 className="h-8 w-8" aria-hidden="true" />
+          <div className="relative flex items-center justify-center">
+            <span
+              aria-hidden="true"
+              className="animate-float-note -mr-2 select-none text-2xl sm:text-3xl"
+              style={{ animationDelay: "0ms" }}
+            >
+              🎵
+            </span>
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-stage/15 text-stage shadow-lg">
+              <Mic2 className="h-10 w-10" aria-hidden="true" />
+            </div>
+            <span
+              aria-hidden="true"
+              className="animate-float-note -ml-2 select-none text-2xl sm:text-3xl"
+              style={{ animationDelay: "1.1s" }}
+            >
+              🎶
+            </span>
           </div>
-          <p className="mt-4 text-xl font-bold text-ink sm:text-2xl">
-            Listos para cantar
+          <p className="mt-5 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+            ¡Listos para cantar! 🎤✨
           </p>
           <p className="mt-2 max-w-md text-sm text-ink-secondary sm:text-base">
-            Escanea el código QR con tu celular o agrega una canción desde el
-            buscador del anfitrión para iniciar la música.
+            Escanea el código QR con tu celular o pulsa{" "}
+            <strong className="text-stage">+ Agregar</strong> para encender el
+            escenario.
           </p>
         </div>
       )}
